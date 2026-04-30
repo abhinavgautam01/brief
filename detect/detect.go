@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -1260,7 +1262,7 @@ func (e *Engine) detectGit(absPath string) *brief.GitInfo {
 			for _, name := range strings.Fields(string(out)) {
 				if url, err := e.git(absPath, "remote", "get-url", name); err == nil {
 					mu.Lock()
-					info.Remotes[name] = strings.TrimSpace(string(url))
+					info.Remotes[name] = redactURL(strings.TrimSpace(string(url)))
 					mu.Unlock()
 				}
 			}
@@ -1287,6 +1289,77 @@ func (e *Engine) detectGit(absPath string) *brief.GitInfo {
 	}
 
 	return info
+}
+
+const redactedPlaceholder = "REDACTED"
+
+var scpURLUserinfo = regexp.MustCompile(`^[^@/]+(:[^@/]*)?@`)
+
+// redactURL strips embedded credentials from a git remote URL so they don't
+// end up in reports or terminal scrollback. Tokens can appear as either the
+// password or the username (e.g. https://<pat>@github.com/...), so the whole
+// userinfo section is replaced rather than relying on url.Redacted.
+func redactURL(raw string) string {
+	if !strings.Contains(raw, "@") {
+		return raw
+	}
+
+	if u, err := url.Parse(raw); err == nil && u.User != nil {
+		if redactUserinfo(u.User) {
+			u.User = url.User(redactedPlaceholder)
+			return u.String()
+		}
+		return raw
+	}
+
+	// scp-like syntax (user@host:path) that url.Parse can't handle.
+	if loc := scpURLUserinfo.FindStringIndex(raw); loc != nil {
+		userinfo := raw[:loc[1]-1]
+		if strings.Contains(userinfo, ":") || looksLikeToken(userinfo) {
+			return redactedPlaceholder + "@" + raw[loc[1]:]
+		}
+	}
+
+	return raw
+}
+
+func redactUserinfo(u *url.Userinfo) bool {
+	if _, hasPassword := u.Password(); hasPassword {
+		return true
+	}
+	return looksLikeToken(u.Username())
+}
+
+var tokenPrefixes = []string{
+	"github_pat_", "ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_",
+	"glpat-", "gldt-", "glrt-", "glsoat-", "glcbt-",
+	"ATCTT", "BBDC-",
+}
+
+func looksLikeToken(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, p := range tokenPrefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	// Heuristic: long alphanumeric blobs used as bare usernames are almost
+	// certainly access tokens rather than real account names.
+	const suspiciousLen = 24
+	if len(s) < suspiciousLen {
+		return false
+	}
+	for _, r := range s {
+		if r == '-' || r == '_' || r == '.' {
+			continue
+		}
+		if (r < '0' || r > '9') && (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') {
+			return false
+		}
+	}
+	return true
 }
 
 // git runs a git command in the given directory and returns its output.

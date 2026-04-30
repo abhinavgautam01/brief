@@ -147,7 +147,9 @@ func cloneURL(ctx context.Context, url, name string, opts Options) (*Source, err
 		if managed {
 			_ = os.RemoveAll(dir)
 		}
-		return nil, fmt.Errorf("cloning %s: %w", url, err)
+		// git already wrote a (credential-redacted) failure message to
+		// stderr, so don't repeat the raw URL here.
+		return nil, fmt.Errorf("git clone failed: %w", err)
 	}
 
 	cleanup := func() {
