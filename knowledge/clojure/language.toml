@@ -12,3 +12,49 @@ ecosystems = ["clojure"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "eval"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Evaluates Clojure forms"
+
+[[security.sinks]]
+symbol = "load-string"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Reads and evaluates forms from a string"
+
+[[security.sinks]]
+symbol = "clojure.java.shell/sh"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Dangerous when command or args are caller-controlled"
+
+[[security.sinks]]
+symbol = "sh/sh"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "read-string"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Prefer clojure.edn/read-string for untrusted data"
+
+[[security.sinks]]
+symbol = "clojure.core/read"
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "slurp"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path or URL is caller-controlled"
+
+[[security.sinks]]
+symbol = "clojure.xml/parse"
+threat = "xxe"
+cwe = "CWE-611"
+note = "XML parsing of untrusted input can resolve external entities"

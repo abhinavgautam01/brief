@@ -12,3 +12,42 @@ ecosystems = ["ocaml"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "Sys.command"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a command through the system shell"
+
+[[security.sinks]]
+symbol = "Unix.execvp"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Dangerous when command or args are caller-controlled"
+
+[[security.sinks]]
+symbol = "Unix.create_process"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "Unix.open_process"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "Marshal.from_channel"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "OCaml Marshal format is unsafe for untrusted data"
+
+[[security.sinks]]
+symbol = "Marshal.from_string"
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "open_in"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"

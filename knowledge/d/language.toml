@@ -12,3 +12,41 @@ ecosystems = ["d"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "std.process.execute"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Dangerous when command or args are caller-controlled"
+
+[[security.sinks]]
+symbol = "std.process.spawnProcess"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "std.process.spawnShell"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a command through the system shell"
+
+[[security.sinks]]
+symbol = "std.process.pipeShell"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "core.stdc.stdlib.system"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "std.file.read"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"
+
+[[security.sinks]]
+symbol = "std.file.readText"
+threat = "path_traversal"
+cwe = "CWE-22"

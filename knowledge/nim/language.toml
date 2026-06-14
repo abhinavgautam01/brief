@@ -12,3 +12,38 @@ ecosystems = ["nim"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "execShellCmd"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a command through the system shell"
+
+[[security.sinks]]
+symbol = "execProcess"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Dangerous when command or args are caller-controlled"
+
+[[security.sinks]]
+symbol = "startProcess"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "gorge"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Compile-time shell execution"
+
+[[security.sinks]]
+symbol = "staticExec"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Compile-time shell execution"
+
+[[security.sinks]]
+symbol = "readFile"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"

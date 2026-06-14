@@ -12,3 +12,50 @@ ecosystems = ["erlang"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "os:cmd"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a command through the system shell"
+
+[[security.sinks]]
+symbol = "open_port"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "With {spawn, Command} or caller-controlled executable"
+
+[[security.sinks]]
+symbol = "erl_eval:exprs"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Evaluates Erlang expressions"
+
+[[security.sinks]]
+symbol = "erlang:binary_to_term"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Use the safe option for untrusted binaries"
+
+[[security.sinks]]
+symbol = "binary_to_term"
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "erlang:list_to_atom"
+threat = "dos"
+cwe = "CWE-400"
+note = "Atoms are not garbage collected"
+
+[[security.sinks]]
+symbol = "file:read_file"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"
+
+[[security.sinks]]
+symbol = "httpc:request"
+threat = "ssrf"
+cwe = "CWE-918"
+note = "When URL is caller-controlled"

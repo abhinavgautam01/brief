@@ -11,3 +11,49 @@ ecosystems = ["r"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "system"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Passes a string to the system shell"
+
+[[security.sinks]]
+symbol = "system2"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Command and args are dangerous when caller-controlled"
+
+[[security.sinks]]
+symbol = "eval(parse())"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Parses and evaluates R source from strings"
+
+[[security.sinks]]
+symbol = "parse"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Dangerous when paired with eval on caller-controlled text"
+
+[[security.sinks]]
+symbol = "source"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Executes R source from caller-controlled files or URLs"
+
+[[security.sinks]]
+symbol = "unserialize"
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "readRDS"
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "readLines"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When path is caller-controlled"

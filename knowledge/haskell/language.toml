@@ -11,3 +11,44 @@ ecosystems = ["haskell"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "System.Process.callCommand"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a command through the system shell"
+
+[[security.sinks]]
+symbol = "System.Process.readProcess"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Dangerous when command or args are caller-controlled"
+
+[[security.sinks]]
+symbol = "System.Process.createProcess"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "System.Process.shell"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Shell command constructor"
+
+[[security.sinks]]
+symbol = "unsafePerformIO"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Unsafe effect boundary; audit when exposed to dynamic evaluation or plugins"
+
+[[security.sinks]]
+symbol = "Data.Binary.decode"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Binary decoding of untrusted bytes can allocate or instantiate unexpected values"
+
+[[security.sinks]]
+symbol = "readFile"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"
