@@ -1,0 +1,51 @@
+[tool]
+name = "Spring Security"
+category = "library"
+homepage = "https://spring.io/projects/spring-security"
+docs = "https://docs.spring.io/spring-security/reference/"
+repo = "https://github.com/spring-projects/spring-security"
+description = "Authentication and authorization framework for Spring applications"
+
+[detect]
+dependencies = [
+  "org.springframework.security:spring-security-core",
+  "org.springframework.security:spring-security-web",
+  "org.springframework.security:spring-security-config",
+  "org.springframework.security:spring-security-oauth2-resource-server",
+]
+ecosystems = ["java", "kotlin"]
+
+[taxonomy]
+role = ["library"]
+function = ["authentication"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "@Secured"
+threat = "auth_bypass"
+cwe = "CWE-285"
+note = "Method-level authorization; verify role expressions cover all callers"
+
+[[security.sinks]]
+symbol = "@PreAuthorize"
+threat = "auth_bypass"
+cwe = "CWE-285"
+note = "SpEL authorization expression; deny-by-default mistakes bypass checks"
+
+[[security.sinks]]
+symbol = "csrf().disable"
+threat = "csrf"
+cwe = "CWE-352"
+note = "Disables CSRF protection for browser-authenticated routes"
+
+[[security.sinks]]
+symbol = "NoOpPasswordEncoder"
+threat = "weak_crypto"
+cwe = "CWE-327"
+note = "Stores or compares passwords without hashing"
+
+[[security.sinks]]
+symbol = "oauth2ResourceServer"
+threat = "auth_bypass"
+cwe = "CWE-287"
+note = "Verify issuer, audience, and algorithm validation"

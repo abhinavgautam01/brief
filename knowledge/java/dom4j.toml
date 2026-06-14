@@ -1,0 +1,34 @@
+[tool]
+name = "dom4j"
+category = "library"
+homepage = "https://dom4j.github.io"
+docs = "https://dom4j.github.io"
+repo = "https://github.com/dom4j/dom4j"
+description = "XML, XPath, and XSLT library for Java"
+
+[detect]
+dependencies = ["org.dom4j:dom4j", "dom4j:dom4j"]
+ecosystems = ["java"]
+
+[taxonomy]
+role = ["library"]
+function = ["parsing"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "SAXReader.read"
+threat = "xxe"
+cwe = "CWE-611"
+note = "Disable external entities when parsing caller-controlled XML"
+
+[[security.sinks]]
+symbol = "DocumentHelper.parseText"
+threat = "xxe"
+cwe = "CWE-611"
+note = "Parses XML strings; ensure the reader is hardened against XXE"
+
+[[security.sinks]]
+symbol = "XSLTResultTarget"
+threat = "xxe"
+cwe = "CWE-611"
+note = "XSLT processing can resolve external resources"

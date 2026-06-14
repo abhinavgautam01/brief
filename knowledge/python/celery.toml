@@ -1,0 +1,39 @@
+[tool]
+name = "Celery"
+category = "library"
+homepage = "https://docs.celeryq.dev"
+docs = "https://docs.celeryq.dev"
+repo = "https://github.com/celery/celery"
+description = "Distributed task queue for Python"
+
+[detect]
+dependencies = ["celery"]
+ecosystems = ["python"]
+
+[taxonomy]
+role = ["library"]
+function = ["messaging", "serialization"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "task_serializer = \"pickle\""
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Pickle task messages execute code during deserialization"
+
+[[security.sinks]]
+symbol = "accept_content = [\"pickle\"]"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Accepting pickle messages from untrusted brokers is dangerous"
+
+[[security.sinks]]
+symbol = "result_serializer = \"pickle\""
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "send_task"
+threat = "auth_bypass"
+cwe = "CWE-306"
+note = "Unauthenticated broker access can enqueue arbitrary tasks"
