@@ -888,17 +888,9 @@ func parseGoWorkUsePaths(content string) []string {
 		}
 
 		if inUseBlock {
-			if fields[0] == ")" {
-				inUseBlock = false
-				continue
-			}
-			for _, field := range fields {
-				if field == ")" {
-					inUseBlock = false
-					break
-				}
-				paths = append(paths, cleanWorkspaceMember(field))
-			}
+			var closed bool
+			paths, closed = appendGoWorkUseFields(paths, fields)
+			inUseBlock = !closed
 			continue
 		}
 
@@ -906,26 +898,28 @@ func parseGoWorkUsePaths(content string) []string {
 			continue
 		}
 		if len(fields) >= 2 && fields[1] == "(" {
-			for _, field := range fields[2:] {
-				if field == ")" {
-					break
-				}
-				paths = append(paths, cleanWorkspaceMember(field))
-			}
-			inUseBlock = true
-			if fields[len(fields)-1] == ")" {
-				inUseBlock = false
-			}
+			var closed bool
+			paths, closed = appendGoWorkUseFields(paths, fields[2:])
+			inUseBlock = !closed
 			continue
 		}
-		for _, field := range fields[1:] {
-			if field == "(" || field == ")" {
-				continue
-			}
+		paths, _ = appendGoWorkUseFields(paths, fields[1:])
+	}
+	return paths
+}
+
+func appendGoWorkUseFields(paths []string, fields []string) ([]string, bool) {
+	for _, field := range fields {
+		switch field {
+		case "(":
+			continue
+		case ")":
+			return paths, true
+		default:
 			paths = append(paths, cleanWorkspaceMember(field))
 		}
 	}
-	return paths
+	return paths, false
 }
 
 func stripGoWorkComment(line string) string {
@@ -956,6 +950,9 @@ func (e *Engine) expandWorkspacePattern(pattern string) []string {
 	if pattern == "." || pattern == "" || strings.HasPrefix(pattern, "../") || filepath.IsAbs(pattern) {
 		return nil
 	}
+	// filepath.Glob does not implement recursive doublestar matching: `**`
+	// behaves like `*`, so workspace patterns such as packages/** only match
+	// one directory segment.
 	matches, err := filepath.Glob(filepath.Join(e.Root, filepath.FromSlash(pattern)))
 	if err != nil || len(matches) == 0 {
 		return []string{pattern}
