@@ -1,0 +1,34 @@
+[tool]
+name = "Busboy"
+category = "library"
+homepage = "https://github.com/mscdex/busboy"
+docs = "https://github.com/mscdex/busboy"
+repo = "https://github.com/mscdex/busboy"
+description = "Streaming parser for HTML form data"
+
+[detect]
+dependencies = ["busboy"]
+ecosystems = ["node"]
+
+[taxonomy]
+role = ["library"]
+function = ["file-management", "parsing"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "filename"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "Client-controlled Content-Disposition filename"
+
+[[security.sinks]]
+symbol = "preservePath"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "Preserves client-supplied path components when enabled"
+
+[[security.sinks]]
+symbol = "file"
+threat = "dos"
+cwe = "CWE-400"
+note = "Set fileSize, files, and parts limits for untrusted uploads"

@@ -1,0 +1,33 @@
+[tool]
+name = "cross-spawn"
+category = "library"
+homepage = "https://github.com/moxystudio/node-cross-spawn"
+docs = "https://github.com/moxystudio/node-cross-spawn"
+repo = "https://github.com/moxystudio/node-cross-spawn"
+description = "Cross-platform child_process.spawn wrapper"
+
+[detect]
+dependencies = ["cross-spawn"]
+ecosystems = ["node"]
+
+[taxonomy]
+role = ["library"]
+function = ["process-execution"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "spawn"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Array argv form is safer; shell option or caller-controlled command is dangerous"
+
+[[security.sinks]]
+symbol = "spawn.sync"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "shell"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "options.shell passes through a command shell"

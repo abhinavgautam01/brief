@@ -1,0 +1,34 @@
+[tool]
+name = "Fabric"
+category = "library"
+homepage = "https://www.fabfile.org"
+docs = "https://docs.fabfile.org"
+repo = "https://github.com/fabric/fabric"
+description = "Python SSH command execution library"
+
+[detect]
+dependencies = ["fabric"]
+ecosystems = ["python"]
+
+[taxonomy]
+role = ["library"]
+function = ["process-execution"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "Connection.run"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a remote shell command"
+
+[[security.sinks]]
+symbol = "Connection.sudo"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a remote command with elevated privileges"
+
+[[security.sinks]]
+symbol = "Connection.local"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a local shell command through Invoke"

@@ -1,0 +1,33 @@
+[tool]
+name = "JDOM"
+category = "library"
+homepage = "http://www.jdom.org"
+docs = "http://www.jdom.org/docs/apidocs/"
+repo = "https://github.com/hunterhacker/jdom"
+description = "Java XML document model"
+
+[detect]
+dependencies = ["org.jdom:jdom2", "jdom:jdom"]
+ecosystems = ["java"]
+
+[taxonomy]
+role = ["library"]
+function = ["parsing"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "SAXBuilder.build"
+threat = "xxe"
+cwe = "CWE-611"
+note = "Disable DTDs and external entities for caller-controlled XML"
+
+[[security.sinks]]
+symbol = "DOMBuilder.build"
+threat = "xxe"
+cwe = "CWE-611"
+
+[[security.sinks]]
+symbol = "XSLTransformer"
+threat = "xxe"
+cwe = "CWE-611"
+note = "XSLT processing can resolve external resources"

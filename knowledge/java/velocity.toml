@@ -1,0 +1,39 @@
+[tool]
+name = "Velocity"
+category = "library"
+homepage = "https://velocity.apache.org"
+docs = "https://velocity.apache.org/engine/"
+repo = "https://github.com/apache/velocity-engine"
+description = "Template engine for Java"
+
+[detect]
+dependencies = ["org.apache.velocity:velocity-engine-core", "org.apache.velocity:velocity"]
+ecosystems = ["java"]
+
+[taxonomy]
+role = ["library"]
+function = ["templating"]
+layer = ["backend"]
+
+[[security.sinks]]
+symbol = "Velocity.evaluate"
+threat = "ssti"
+cwe = "CWE-1336"
+note = "Evaluates template strings; dangerous when template text is caller-controlled"
+
+[[security.sinks]]
+symbol = "RuntimeServices.evaluate"
+threat = "ssti"
+cwe = "CWE-1336"
+
+[[security.sinks]]
+symbol = "Template.merge"
+threat = "xss"
+cwe = "CWE-79"
+note = "Velocity does not auto-escape HTML output by default"
+
+[[security.sinks]]
+symbol = "#evaluate"
+threat = "ssti"
+cwe = "CWE-1336"
+note = "Template directive that evaluates generated VTL"
