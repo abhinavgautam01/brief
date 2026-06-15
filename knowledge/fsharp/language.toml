@@ -38,7 +38,7 @@ note = "Newtonsoft with TypeNameHandling enabled"
 
 [[security.sinks]]
 symbol = "Assembly.Load"
-threat = "code_injection"
+threat = "unsafe_reflection"
 cwe = "CWE-470"
 note = "When assembly name or bytes are caller-controlled"
 

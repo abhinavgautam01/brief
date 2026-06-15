@@ -47,9 +47,3 @@ symbol = "File.read"
 threat = "path_traversal"
 cwe = "CWE-22"
 note = "When file path is caller-controlled"
-
-[[security.sinks]]
-symbol = "YAML.parse"
-threat = "deserialization"
-cwe = "CWE-502"
-note = "Avoid parsing untrusted YAML into application objects"
