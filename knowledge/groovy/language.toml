@@ -12,3 +12,46 @@ ecosystems = ["groovy"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "GroovyShell.evaluate"
+threat = "code_injection"
+cwe = "CWE-94"
+note = "Evaluates Groovy source; dangerous when script text is caller-controlled"
+
+[[security.sinks]]
+symbol = "Eval.me"
+threat = "code_injection"
+cwe = "CWE-94"
+
+[[security.sinks]]
+symbol = "Eval.x"
+threat = "code_injection"
+cwe = "CWE-94"
+
+[[security.sinks]]
+symbol = "Eval.xy"
+threat = "code_injection"
+cwe = "CWE-94"
+
+[[security.sinks]]
+symbol = "String.execute"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a shell command when the string is caller-controlled"
+
+[[security.sinks]]
+symbol = "execute"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "ObjectInputStream.readObject"
+threat = "deserialization"
+cwe = "CWE-502"
+
+[[security.sinks]]
+symbol = "File.text"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"

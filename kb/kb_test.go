@@ -203,6 +203,31 @@ func TestRailsHasTaxonomy(t *testing.T) {
 	}
 }
 
+func TestPriorityNicheLanguagesHaveSinks(t *testing.T) {
+	base := loadKB(t)
+	for _, name := range []string{
+		"Groovy",
+		"R",
+		"Julia",
+		"Haskell",
+		"OCaml",
+		"Nim",
+		"Crystal",
+		"F#",
+		"D",
+		"Erlang",
+		"Clojure",
+	} {
+		tool := base.ByName[name]
+		if tool == nil {
+			t.Fatalf("%s not found in KB", name)
+		}
+		if len(tool.Security.Sinks) == 0 {
+			t.Errorf("%s should have security sinks", name)
+		}
+	}
+}
+
 func TestTaxonomyTermsResolve(t *testing.T) {
 	base := loadKB(t)
 	valid := loadTaxonomyTerms(t)

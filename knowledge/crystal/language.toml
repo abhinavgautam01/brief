@@ -12,3 +12,38 @@ ecosystems = ["crystal"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "system"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Runs a command through the system shell"
+
+[[security.sinks]]
+symbol = "Process.run"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Dangerous when command or args are caller-controlled"
+
+[[security.sinks]]
+symbol = "Process.new"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "`"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Backtick command execution"
+
+[[security.sinks]]
+symbol = "run"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "Macro compile-time command execution"
+
+[[security.sinks]]
+symbol = "File.read"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"

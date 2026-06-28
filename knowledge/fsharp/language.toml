@@ -12,3 +12,44 @@ ecosystems = ["fsharp"]
 
 [taxonomy]
 role = ["language"]
+
+[[security.sinks]]
+symbol = "Process.Start"
+threat = "command_injection"
+cwe = "CWE-78"
+
+[[security.sinks]]
+symbol = "ProcessStartInfo"
+threat = "command_injection"
+cwe = "CWE-78"
+note = "When FileName or Arguments are caller-controlled"
+
+[[security.sinks]]
+symbol = "BinaryFormatter.Deserialize"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Obsolete formatter with gadget-chain risk"
+
+[[security.sinks]]
+symbol = "JsonConvert.DeserializeObject"
+threat = "deserialization"
+cwe = "CWE-502"
+note = "Newtonsoft with TypeNameHandling enabled"
+
+[[security.sinks]]
+symbol = "Assembly.Load"
+threat = "unsafe_reflection"
+cwe = "CWE-470"
+note = "When assembly name or bytes are caller-controlled"
+
+[[security.sinks]]
+symbol = "Activator.CreateInstance"
+threat = "unsafe_reflection"
+cwe = "CWE-470"
+note = "When type name is caller-controlled"
+
+[[security.sinks]]
+symbol = "File.ReadAllText"
+threat = "path_traversal"
+cwe = "CWE-22"
+note = "When file path is caller-controlled"
