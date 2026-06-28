@@ -522,6 +522,97 @@ func TestSQLiteDetection(t *testing.T) {
 	assertToolDetected(t, r, "database", "SQLite")
 }
 
+func TestCargoWorkspaceMemberDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "Cargo.toml", `[workspace]
+members = ["crates/*"]
+`)
+	writeFile(t, dir, "crates/app/Cargo.toml", `[package]
+name = "app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+reqwest = "0.12"
+`)
+	writeFile(t, dir, "crates/app/src/lib.rs", "pub fn app() {}\n")
+
+	r, err := New(loadKB(t), dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertToolDetected(t, r, "monorepo", "Cargo workspaces")
+	assertToolDetected(t, r, "library", "reqwest")
+}
+
+func TestGoWorkspaceMemberDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "go.work", `go 1.22
+
+use (
+	./services/api
+)
+`)
+	writeFile(t, dir, "services/api/go.mod", `module example.com/api
+
+go 1.22
+
+require github.com/go-resty/resty/v2 v2.16.5
+`)
+	writeFile(t, dir, "services/api/main.go", "package main\nfunc main() {}\n")
+
+	r, err := New(loadKB(t), dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertToolDetected(t, r, "monorepo", "Go workspace")
+	assertToolDetected(t, r, "library", "Resty")
+}
+
+func TestPackageWorkspaceMemberDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "package.json", `{
+  "private": true,
+  "workspaces": ["packages/*"]
+}`)
+	writeFile(t, dir, "packages/web/package.json", `{
+  "dependencies": {
+    "axios": "^1.7.0"
+  }
+}`)
+	writeFile(t, dir, "packages/web/index.js", "import axios from 'axios'\n")
+
+	r, err := New(loadKB(t), dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertToolDetected(t, r, "monorepo", "Yarn workspaces")
+	assertToolDetected(t, r, "library", "axios")
+}
+
+func TestPnpmWorkspaceMemberDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "package.json", `{"private": true}`)
+	writeFile(t, dir, "pnpm-workspace.yaml", "packages:\n  - packages/*\n")
+	writeFile(t, dir, "packages/web/package.json", `{
+  "dependencies": {
+    "axios": "^1.7.0"
+  }
+}`)
+	writeFile(t, dir, "packages/web/index.js", "import axios from 'axios'\n")
+
+	r, err := New(loadKB(t), dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertToolDetected(t, r, "monorepo", "pnpm workspaces")
+	assertToolDetected(t, r, "library", "axios")
+}
+
 func TestNodeProject(t *testing.T) {
 	engine := New(loadKB(t), "../testdata/node-project")
 	r, err := engine.Run()

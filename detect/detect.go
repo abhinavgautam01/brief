@@ -672,18 +672,7 @@ func (e *Engine) loadDeps() {
 	e.devDeps = make(map[string]bool)
 	e.allDeps = make(map[string]bool)
 
-	// Collect all manifest file paths, including workflow files
-	var manifestPaths []string
-	manifestPaths = append(manifestPaths, e.KB.ManifestFiles...)
-	// GitHub Actions workflow files
-	wfMatches, _ := filepath.Glob(filepath.Join(e.Root, ".github/workflows/*.yml"))
-	wfMatchesYAML, _ := filepath.Glob(filepath.Join(e.Root, ".github/workflows/*.yaml"))
-	for _, m := range append(wfMatches, wfMatchesYAML...) {
-		rel, err := filepath.Rel(e.Root, m)
-		if err == nil {
-			manifestPaths = append(manifestPaths, rel)
-		}
-	}
+	manifestPaths := e.manifestPaths()
 
 	for _, mf := range manifestPaths {
 		data, err := e.safeReadFile(mf)
@@ -732,6 +721,260 @@ func (e *Engine) loadDeps() {
 			})
 		}
 	}
+}
+
+// manifestPaths returns root manifest files plus workspace member manifests.
+func (e *Engine) manifestPaths() []string {
+	var paths []string
+	seen := make(map[string]bool)
+	add := func(p string) {
+		p = filepath.ToSlash(filepath.Clean(p))
+		if p == "." || strings.HasPrefix(p, "../") || filepath.IsAbs(p) {
+			return
+		}
+		if seen[p] {
+			return
+		}
+		seen[p] = true
+		paths = append(paths, p)
+	}
+
+	for _, mf := range e.KB.ManifestFiles {
+		add(mf)
+	}
+
+	// GitHub Actions workflow files
+	wfMatches, _ := filepath.Glob(filepath.Join(e.Root, ".github/workflows/*.yml"))
+	wfMatchesYAML, _ := filepath.Glob(filepath.Join(e.Root, ".github/workflows/*.yaml"))
+	for _, m := range append(wfMatches, wfMatchesYAML...) {
+		rel, err := filepath.Rel(e.Root, m)
+		if err == nil {
+			add(rel)
+		}
+	}
+
+	e.addCargoWorkspaceManifests(add)
+	e.addGoWorkspaceManifests(add)
+	e.addPackageWorkspaceManifests(add)
+	e.addPnpmWorkspaceManifests(add)
+
+	return paths
+}
+
+func (e *Engine) addCargoWorkspaceManifests(add func(string)) {
+	data, err := e.safeReadFile("Cargo.toml")
+	if err != nil {
+		return
+	}
+
+	var root struct {
+		Workspace struct {
+			Members []string `toml:"members"`
+			Exclude []string `toml:"exclude"`
+		} `toml:"workspace"`
+	}
+	if err := toml.Unmarshal(data, &root); err != nil {
+		return
+	}
+
+	excluded := e.workspacePatternSet(root.Workspace.Exclude)
+	for _, member := range root.Workspace.Members {
+		for _, dir := range e.expandWorkspacePattern(member) {
+			if excluded[dir] {
+				continue
+			}
+			add(path.Join(dir, "Cargo.toml"))
+		}
+	}
+}
+
+func (e *Engine) addGoWorkspaceManifests(add func(string)) {
+	data, err := e.safeReadFile("go.work")
+	if err != nil {
+		return
+	}
+	for _, member := range parseGoWorkUsePaths(string(data)) {
+		add(path.Join(member, "go.mod"))
+	}
+}
+
+func (e *Engine) addPackageWorkspaceManifests(add func(string)) {
+	data, err := e.safeReadFile("package.json")
+	if err != nil {
+		return
+	}
+
+	var root struct {
+		Workspaces any `json:"workspaces"`
+	}
+	if err := json.Unmarshal(data, &root); err != nil {
+		return
+	}
+	for _, pattern := range packageWorkspacePatterns(root.Workspaces) {
+		for _, dir := range e.expandWorkspacePattern(pattern) {
+			add(path.Join(dir, "package.json"))
+		}
+	}
+}
+
+func (e *Engine) addPnpmWorkspaceManifests(add func(string)) {
+	data, err := e.safeReadFile("pnpm-workspace.yaml")
+	if err != nil {
+		return
+	}
+
+	var root struct {
+		Packages []string `yaml:"packages"`
+	}
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return
+	}
+
+	var includes []string
+	var excludes []string
+	for _, pattern := range root.Packages {
+		if strings.HasPrefix(pattern, "!") {
+			excludes = append(excludes, strings.TrimPrefix(pattern, "!"))
+			continue
+		}
+		includes = append(includes, pattern)
+	}
+	excluded := e.workspacePatternSet(excludes)
+	for _, pattern := range includes {
+		for _, dir := range e.expandWorkspacePattern(pattern) {
+			if excluded[dir] {
+				continue
+			}
+			add(path.Join(dir, "package.json"))
+		}
+	}
+}
+
+func packageWorkspacePatterns(workspaces any) []string {
+	switch v := workspaces.(type) {
+	case []any:
+		var patterns []string
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				patterns = append(patterns, s)
+			}
+		}
+		return patterns
+	case map[string]any:
+		packages, ok := v["packages"].([]any)
+		if !ok {
+			return nil
+		}
+		var patterns []string
+		for _, item := range packages {
+			if s, ok := item.(string); ok {
+				patterns = append(patterns, s)
+			}
+		}
+		return patterns
+	default:
+		return nil
+	}
+}
+
+func parseGoWorkUsePaths(content string) []string {
+	var paths []string
+	inUseBlock := false
+	for _, line := range strings.Split(content, "\n") {
+		line = stripGoWorkComment(line)
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+
+		if inUseBlock {
+			var closed bool
+			paths, closed = appendGoWorkUseFields(paths, fields)
+			inUseBlock = !closed
+			continue
+		}
+
+		if fields[0] != "use" {
+			continue
+		}
+		if len(fields) >= 2 && fields[1] == "(" {
+			var closed bool
+			paths, closed = appendGoWorkUseFields(paths, fields[2:])
+			inUseBlock = !closed
+			continue
+		}
+		paths, _ = appendGoWorkUseFields(paths, fields[1:])
+	}
+	return paths
+}
+
+func appendGoWorkUseFields(paths []string, fields []string) ([]string, bool) {
+	for _, field := range fields {
+		switch field {
+		case "(":
+			continue
+		case ")":
+			return paths, true
+		default:
+			paths = append(paths, cleanWorkspaceMember(field))
+		}
+	}
+	return paths, false
+}
+
+func stripGoWorkComment(line string) string {
+	if i := strings.Index(line, "//"); i >= 0 {
+		line = line[:i]
+	}
+	return strings.TrimSpace(line)
+}
+
+func cleanWorkspaceMember(member string) string {
+	member = strings.Trim(member, `"'`)
+	member = strings.TrimPrefix(member, "./")
+	return filepath.ToSlash(filepath.Clean(member))
+}
+
+func (e *Engine) workspacePatternSet(patterns []string) map[string]bool {
+	set := make(map[string]bool)
+	for _, pattern := range patterns {
+		for _, dir := range e.expandWorkspacePattern(pattern) {
+			set[dir] = true
+		}
+	}
+	return set
+}
+
+func (e *Engine) expandWorkspacePattern(pattern string) []string {
+	pattern = cleanWorkspaceMember(pattern)
+	if pattern == "." || pattern == "" || strings.HasPrefix(pattern, "../") || filepath.IsAbs(pattern) {
+		return nil
+	}
+	// filepath.Glob does not implement recursive doublestar matching: `**`
+	// behaves like `*`, so workspace patterns such as packages/** only match
+	// one directory segment.
+	matches, err := filepath.Glob(filepath.Join(e.Root, filepath.FromSlash(pattern)))
+	if err != nil || len(matches) == 0 {
+		return []string{pattern}
+	}
+	var dirs []string
+	for _, match := range matches {
+		info, err := os.Stat(match)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		rel, err := filepath.Rel(e.Root, match)
+		if err != nil {
+			continue
+		}
+		rel = filepath.ToSlash(filepath.Clean(rel))
+		if rel == "." || strings.HasPrefix(rel, "../") {
+			continue
+		}
+		dirs = append(dirs, rel)
+	}
+	sort.Strings(dirs)
+	return dirs
 }
 
 // hasDependency checks if any of the tool's declared dependencies exist
