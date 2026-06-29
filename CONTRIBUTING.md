@@ -115,11 +115,20 @@ Shared tools that work across languages (Docker, GitHub Actions, Dependabot) sho
 | `lint` | Linter or static analysis |
 | `format` | Code formatter |
 | `typecheck` | Type checker |
-| `build` | Build tool |
 | `docs` | Documentation generator |
+| `build` | Build tool, framework, or application platform |
+| `library` | Detection-only library or runtime dependency |
+| `codegen` | Code generator or schema-driven tooling |
+| `database` | Database, ORM, migration, or query tooling |
 | `security` | Security scanner |
 | `ci` | Continuous integration |
 | `container` | Container tooling |
+| `infrastructure` | Infrastructure-as-code or deployment tooling |
+| `monorepo` | Monorepo workspace or build orchestration |
+| `environment` | Developer environment, runtime, or feature flag tooling |
+| `i18n` | Localization and internationalization tooling |
+| `release` | Release automation and publishing |
+| `coverage` | Coverage reporting |
 | `dependency_bot` | Automated dependency updates |
 
 ## Adding an ecosystem
