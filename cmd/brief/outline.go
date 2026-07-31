@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -54,12 +55,12 @@ func cmdOutline(args []string) {
 		opts.Ignore = strings.Split(*ignore, ",")
 	}
 
-	code := runOutline(src.Dir, opts, *xmlFlag)
+	code := runOutline(src.Dir, opts, *xmlFlag, os.Stdout)
 	src.Cleanup()
 	os.Exit(code)
 }
 
-func runOutline(dir string, opts outline.Options, xmlOut bool) int {
+func runOutline(dir string, opts outline.Options, xmlOut bool, output io.Writer) int {
 	r, err := outline.Pack(dir, opts)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -67,9 +68,9 @@ func runOutline(dir string, opts outline.Options, xmlOut bool) int {
 	}
 
 	if xmlOut {
-		err = r.XML(os.Stdout)
+		err = r.XML(output)
 	} else {
-		err = r.Markdown(os.Stdout)
+		err = r.Markdown(output)
 	}
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "error writing output: %v\n", err)
