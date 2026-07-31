@@ -8,7 +8,7 @@ require (
 	github.com/git-pkgs/forge v0.7.0
 	github.com/git-pkgs/licensecheck v0.4.1
 	github.com/git-pkgs/manifests v0.6.1
-	github.com/git-pkgs/outline v0.1.7
+	github.com/git-pkgs/outline v0.1.8
 	github.com/git-pkgs/purl v0.1.15
 	github.com/git-pkgs/registries v0.6.4
 	github.com/git-pkgs/spdx v0.1.4
@@ -21,6 +21,7 @@ require (
 	github.com/bazelbuild/buildtools v0.0.0-20260622120422-77b9b380c0a4 // indirect
 	github.com/ecosyste-ms/ecosystems-go v0.4.0 // indirect
 	github.com/git-pkgs/gitignore v1.2.0 // indirect
+	github.com/git-pkgs/magic v0.1.0 // indirect
 	github.com/git-pkgs/packageurl-go v0.3.1 // indirect
 	github.com/git-pkgs/pom v0.1.5 // indirect
 	github.com/git-pkgs/vers v0.3.0 // indirect
