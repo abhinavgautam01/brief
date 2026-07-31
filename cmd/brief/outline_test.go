@@ -19,13 +19,17 @@ func TestRunOutlineSkipsDetectedBinaryContent(t *testing.T) {
 	writeFile(t, dir, "document.pdf", "%PDF-1.7\nbody\n")
 
 	var output bytes.Buffer
-	if code := runOutline(dir, outline.Options{}, false, &output); code != 0 {
+	opts := outline.Options{Compress: true}
+	if code := runOutline(dir, opts, false, &output); code != 0 {
 		t.Fatalf("runOutline() = %d, want 0", code)
 	}
 
 	got := output.String()
-	if !strings.Contains(got, "### document.pdf\n\n_(skipped: binary,") {
-		t.Errorf("output does not mark PDF as binary:\n%s", got)
+	if !strings.Contains(got, "document.pdf") {
+		t.Errorf("output omits PDF path:\n%s", got)
+	}
+	if !strings.Contains(got, "skipped: binary") {
+		t.Errorf("output does not mark content as binary:\n%s", got)
 	}
 	if strings.Contains(got, "%PDF-1.7") {
 		t.Errorf("output includes PDF content:\n%s", got)
