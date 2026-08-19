@@ -1116,6 +1116,7 @@ func TestPythonRustNativeExtensionProjects(t *testing.T) {
 		tool    string
 	}{
 		{name: "Maturin", fixture: "../testdata/maturin-project", tool: "Maturin"},
+		{name: "meson-python", fixture: "../testdata/meson-python-rust-project", tool: "meson-python"},
 		{name: "setuptools-rust", fixture: "../testdata/setuptools-rust-project", tool: "setuptools-rust"},
 	}
 
@@ -1125,6 +1126,14 @@ func TestPythonRustNativeExtensionProjects(t *testing.T) {
 			assertToolDetectedWithConfidence(t, r, "native_extension", tt.tool, brief.ConfidenceHigh)
 		})
 	}
+}
+
+func TestMesonPythonBuildBackendSignal(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFile(t, dir, "pyproject.toml", "[build-system]\nrequires = ['meson-python']\nbuild-backend = 'mesonpy'\n")
+
+	r := runOn(t, dir)
+	assertToolDetectedWithConfidence(t, r, "native_extension", "meson-python", brief.ConfidenceHigh)
 }
 
 func TestPythonRustNativeExtensionSignals(t *testing.T) {
