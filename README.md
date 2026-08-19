@@ -70,11 +70,13 @@ brief crate:serde
 brief pypi:requests
 ```
 
+Local scans recurse through the project tree. Use `--scan-depth N` to limit recursion, `--skip dir1,dir2` to add directory exclusions, or `--tracked` to consider only files tracked by Git. When Rust source exists without a root `Cargo.toml`, brief uses the shallowest `Cargo.toml` within the scan depth as an additional manifest root. Cargo workspace member manifests are also checked for tool configuration.
+
 Remote sources are shallow-cloned by default. Use `--depth 0` for a full clone, `--keep` to preserve the clone, or `--dir ./somewhere` to clone into a specific directory. Use `--cache ./cache` to keep one shallow checkout per HTTPS URL and reuse it across runs. Cache mode cannot be combined with `--depth 0` or `--dir`.
 
 JSON when piped, human-readable on a TTY. Force either with `--json` or `--human`. Use `--category test` to filter to a single category.
 
-JSON reports include a `manifests` array with the path, kind, and package ecosystem of every parsed manifest or lockfile. The `dependencies` array keeps direct constraints from manifests and adds pinned transitive packages from lockfiles with `direct` set to `false`.
+JSON reports include a `manifests` array with the path, kind, and package ecosystem of every parsed manifest or lockfile. The `dependencies` array includes constraints from manifests and pinned packages from lockfiles, preserving directness and scope when the source records them. For Cargo, direct constraints come from `Cargo.toml`; pinned `Cargo.lock` entries are reported with `direct` set to `false`.
 
 ```
 brief dev — /home/user/myproject
