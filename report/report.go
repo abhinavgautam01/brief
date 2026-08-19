@@ -47,10 +47,13 @@ func JSON(w io.Writer, r *brief.Report) error {
 	return enc.Encode(r)
 }
 
-const maxDisplayItems = 20 // max items to show before truncating
+const (
+	maxDisplayItems = 20 // max items to show before truncating
+	categoryI18n    = "i18n"
+)
 
 // CategoryOrder defines the stable display order for tool categories.
-var CategoryOrder = []string{"test", "lint", "format", "typecheck", "docs", "build", "native_extension", "library", "codegen", "database", "security", "ci", "container", "infrastructure", "monorepo", "environment", "i18n", "release", "coverage", "dependency_bot"}
+var CategoryOrder = []string{"test", "lint", "format", "typecheck", "docs", "build", "native_extension", "library", "codegen", "database", "security", "ci", "container", "infrastructure", "monorepo", "environment", categoryI18n, "release", "coverage", "dependency_bot"}
 
 // CategoryLabels maps category keys to human-readable labels.
 var CategoryLabels = map[string]string{
@@ -70,7 +73,7 @@ var CategoryLabels = map[string]string{
 	"infrastructure":   "Infra",
 	"monorepo":         "Monorepo",
 	"environment":      "Environment",
-	"i18n":             "i18n",
+	categoryI18n:       categoryI18n,
 	"release":          "Release",
 	"coverage":         "Coverage",
 	"dependency_bot":   "Dep Updates",

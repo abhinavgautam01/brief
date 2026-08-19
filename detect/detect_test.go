@@ -72,12 +72,12 @@ func TestRubyTools(t *testing.T) {
 func TestRubyAndBEAMRustIntegrations(t *testing.T) {
 	t.Run("projects", func(t *testing.T) {
 		ruby := runOn(t, "../testdata/ruby-rust-project")
-		assertToolDetectedWithConfidence(t, ruby, "native_extension", "rb-sys", brief.ConfidenceHigh)
-		assertToolDetectedWithConfidence(t, ruby, "library", "Magnus", brief.ConfidenceHigh)
+		assertHighConfidenceToolDetected(t, ruby, "native_extension", "rb-sys")
+		assertHighConfidenceToolDetected(t, ruby, "library", "Magnus")
 		assertToolDetected(t, ruby, "native_extension", "mkmf")
 
 		elixir := runOn(t, "../testdata/rustler-project")
-		assertToolDetectedWithConfidence(t, elixir, "native_extension", "Rustler", brief.ConfidenceHigh)
+		assertHighConfidenceToolDetected(t, elixir, "native_extension", "Rustler")
 	})
 
 	t.Run("signals", func(t *testing.T) {
@@ -138,7 +138,7 @@ func TestRubyAndBEAMRustIntegrations(t *testing.T) {
 				for path, content := range tt.files {
 					writeProjectFile(t, dir, path, content)
 				}
-				assertToolDetectedWithConfidence(t, runOn(t, dir), tt.category, tt.tool, brief.ConfidenceHigh)
+				assertHighConfidenceToolDetected(t, runOn(t, dir), tt.category, tt.tool)
 			})
 		}
 	})
@@ -733,7 +733,7 @@ checksum = "0000000000000000000000000000000000000000000000000000000000000000"
 
 func TestCargoWorkspaceMemberFileContains(t *testing.T) {
 	r := runOn(t, "../testdata/cargo-workspace-ruby-project")
-	assertToolDetectedWithConfidence(t, r, "library", "Magnus", brief.ConfidenceHigh)
+	assertHighConfidenceToolDetected(t, r, "library", "Magnus")
 }
 
 func TestNestedCargoWorkspace(t *testing.T) {
@@ -742,7 +742,7 @@ func TestNestedCargoWorkspace(t *testing.T) {
 		t.Fatalf("expected nested Cargo package manager, got %v", packageManagerNames(r))
 	}
 	assertToolDetected(t, r, "monorepo", "Cargo workspaces")
-	assertToolDetectedWithConfidence(t, r, "native_extension", "napi-rs", brief.ConfidenceHigh)
+	assertHighConfidenceToolDetected(t, r, "native_extension", "napi-rs")
 
 	var cargo brief.Detection
 	for _, pm := range r.PackageManagers {
@@ -958,7 +958,7 @@ func TestNodeRustNativeExtensions(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				r := runOn(t, tt.fixture)
-				assertToolDetectedWithConfidence(t, r, "native_extension", tt.tool, brief.ConfidenceHigh)
+				assertHighConfidenceToolDetected(t, r, "native_extension", tt.tool)
 			})
 		}
 	})
@@ -1031,7 +1031,7 @@ func TestNodeRustNativeExtensions(t *testing.T) {
 					writeProjectFile(t, dir, path, content)
 				}
 				r := runOn(t, dir)
-				assertToolDetectedWithConfidence(t, r, "native_extension", tt.tool, brief.ConfidenceHigh)
+				assertHighConfidenceToolDetected(t, r, "native_extension", tt.tool)
 			})
 		}
 	})
@@ -1123,7 +1123,7 @@ func TestPythonRustNativeExtensionProjects(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := runOn(t, tt.fixture)
-			assertToolDetectedWithConfidence(t, r, "native_extension", tt.tool, brief.ConfidenceHigh)
+			assertHighConfidenceToolDetected(t, r, "native_extension", tt.tool)
 		})
 	}
 }
@@ -1133,7 +1133,7 @@ func TestMesonPythonBuildBackendSignal(t *testing.T) {
 	writeProjectFile(t, dir, "pyproject.toml", "[build-system]\nrequires = ['meson-python']\nbuild-backend = 'mesonpy'\n")
 
 	r := runOn(t, dir)
-	assertToolDetectedWithConfidence(t, r, "native_extension", "meson-python", brief.ConfidenceHigh)
+	assertHighConfidenceToolDetected(t, r, "native_extension", "meson-python")
 }
 
 func TestPythonRustNativeExtensionSignals(t *testing.T) {
@@ -1192,7 +1192,7 @@ func TestPythonRustNativeExtensionSignals(t *testing.T) {
 			dir := t.TempDir()
 			writeProjectFile(t, dir, tt.path, tt.content)
 			r := runOn(t, dir)
-			assertToolDetectedWithConfidence(t, r, "native_extension", tt.tool, brief.ConfidenceHigh)
+			assertHighConfidenceToolDetected(t, r, "native_extension", tt.tool)
 		})
 	}
 }
@@ -2019,20 +2019,19 @@ func assertToolDetected(t *testing.T, r *brief.Report, category, name string) {
 	t.Errorf("expected %s in %s category", name, category)
 }
 
-func assertToolDetectedWithConfidence(
+func assertHighConfidenceToolDetected(
 	t *testing.T,
 	r *brief.Report,
 	category string,
 	name string,
-	confidence brief.Confidence,
 ) {
 	t.Helper()
 	for _, tool := range r.Tools[category] {
 		if tool.Name != name {
 			continue
 		}
-		if tool.Confidence != confidence {
-			t.Errorf("%s confidence = %q, want %q", name, tool.Confidence, confidence)
+		if tool.Confidence != brief.ConfidenceHigh {
+			t.Errorf("%s confidence = %q, want %q", name, tool.Confidence, brief.ConfidenceHigh)
 		}
 		return
 	}

@@ -21,6 +21,8 @@ import (
 	"golang.org/x/term"
 )
 
+const schemaTypeKey = "type"
+
 func main() {
 	// Disable GC for the duration of this short-lived CLI process.
 	// Detection typically completes in under 100ms and allocates modestly,
@@ -348,26 +350,26 @@ func schemaForType(t reflect.Type, defs map[string]any) map[string]any {
 
 	// Skip special types that don't appear in JSON output.
 	if t == reflect.TypeFor[time.Duration]() {
-		return map[string]any{"type": "string"}
+		return map[string]any{schemaTypeKey: "string"}
 	}
 
 	switch t.Kind() {
 	case reflect.String:
-		return map[string]any{"type": "string"}
+		return map[string]any{schemaTypeKey: "string"}
 	case reflect.Bool:
-		return map[string]any{"type": "boolean"}
+		return map[string]any{schemaTypeKey: "boolean"}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return map[string]any{"type": "integer"}
+		return map[string]any{schemaTypeKey: "integer"}
 	case reflect.Float32, reflect.Float64:
-		return map[string]any{"type": "number"}
+		return map[string]any{schemaTypeKey: "number"}
 	case reflect.Slice:
 		return map[string]any{
-			"type":  "array",
-			"items": schemaForType(t.Elem(), defs),
+			schemaTypeKey: "array",
+			"items":       schemaForType(t.Elem(), defs),
 		}
 	case reflect.Map:
 		return map[string]any{
-			"type":                 "object",
+			schemaTypeKey:          "object",
 			"additionalProperties": schemaForType(t.Elem(), defs),
 		}
 	case reflect.Struct:
@@ -409,8 +411,8 @@ func buildStructSchema(t reflect.Type, defs map[string]any) map[string]any {
 		props[name] = schemaForType(f.Type, defs)
 	}
 	return map[string]any{
-		"type":       "object",
-		"properties": props,
+		schemaTypeKey: "object",
+		"properties":  props,
 	}
 }
 

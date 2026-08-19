@@ -33,6 +33,12 @@ const (
 	globSplitParts    = 2      // expected parts when splitting "**/" patterns
 	cargoManifestFile = "Cargo.toml"
 	cargoLockFile     = "Cargo.lock"
+	categoryBuild     = "build"
+	categoryDocs      = "docs"
+	categoryFormat    = "format"
+	categoryLint      = "lint"
+	categoryTest      = "test"
+	categoryTypecheck = "typecheck"
 
 	rankHigh   = 3
 	rankMedium = 2
@@ -343,12 +349,12 @@ func (e *Engine) buildEcosystemSet(report *brief.Report) {
 
 // categoryScriptNames maps tool categories to common script names.
 var categoryScriptNames = map[string][]string{
-	"test":      {"test", "spec"},
-	"lint":      {"lint", "check"},
-	"format":    {"format", "fmt"},
-	"typecheck": {"typecheck", "types", "type-check"},
-	"build":     {"build", "compile"},
-	"docs":      {"docs", "doc"},
+	categoryTest:      {categoryTest, "spec"},
+	categoryLint:      {categoryLint, "check"},
+	categoryFormat:    {categoryFormat, "fmt"},
+	categoryTypecheck: {categoryTypecheck, "types", "type-check"},
+	categoryBuild:     {categoryBuild, "compile"},
+	categoryDocs:      {categoryDocs, "doc"},
 }
 
 // detectTools detects all tool categories and links project scripts.
@@ -2320,11 +2326,11 @@ func detectLicenseType(path string) string {
 
 // recommendedCategories are tool categories that every project benefits from.
 var recommendedCategories = map[string]string{
-	"test":      "Test",
-	"lint":      "Lint",
-	"format":    "Format",
-	"typecheck": "Typecheck",
-	"docs":      "Docs",
+	categoryTest:      "Test",
+	categoryLint:      "Lint",
+	categoryFormat:    "Format",
+	categoryTypecheck: "Typecheck",
+	categoryDocs:      "Docs",
 }
 
 // Missing computes which recommended tool categories have no detected tools
@@ -2348,7 +2354,7 @@ func (e *Engine) Missing(r *brief.Report) *brief.MissingReport {
 	}
 
 	// Check each recommended category against each detected ecosystem.
-	categoryOrder := []string{"test", "lint", "format", "typecheck", "docs"}
+	categoryOrder := []string{categoryTest, categoryLint, categoryFormat, categoryTypecheck, categoryDocs}
 	for _, cat := range categoryOrder {
 		if detected[cat] {
 			continue
