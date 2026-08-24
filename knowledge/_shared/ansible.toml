@@ -7,7 +7,7 @@ repo = "https://github.com/ansible/ansible"
 description = "IT automation and configuration management"
 
 [detect]
-files = ["ansible.cfg", "playbooks/", "roles/", "inventory/"]
+files = ["ansible.cfg", "requirements.yml", "requirements.yaml", "galaxy.yml", "galaxy.yaml", "playbooks/", "roles/", "inventory/"]
 
 [commands]
 run = "ansible-playbook"

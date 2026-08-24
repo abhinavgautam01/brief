@@ -7,7 +7,7 @@ repo = "https://github.com/helm/helm"
 description = "Kubernetes package manager"
 
 [detect]
-files = ["Chart.yaml", "Chart.yml", "charts/"]
+files = ["Chart.yaml", "Chart.yml", "Chart.lock", "requirements.yaml", "requirements.lock", "charts/"]
 
 [commands]
 run = "helm install"

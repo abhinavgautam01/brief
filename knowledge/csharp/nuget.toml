@@ -6,7 +6,7 @@ docs = "https://learn.microsoft.com/en-us/nuget/"
 description = ".NET package manager"
 
 [detect]
-files = ["*.csproj", "packages.config", "nuget.config"]
+files = ["*.csproj", "packages.config", "nuget.config", "Directory.Packages.props", "Directory.Build.props"]
 ecosystems = ["csharp"]
 
 [commands]

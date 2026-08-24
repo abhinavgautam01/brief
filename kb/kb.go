@@ -36,6 +36,7 @@ type ToolInfo struct {
 // DetectInfo holds the detection primitives for a tool.
 type DetectInfo struct {
 	Files           []string            `toml:"files"`
+	ExcludeFiles    []string            `toml:"exclude_files"`
 	Dependencies    []string            `toml:"dependencies"`
 	DevDependencies []string            `toml:"dev_dependencies"`
 	FileContains    map[string][]string `toml:"file_contains"`

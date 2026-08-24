@@ -7,7 +7,7 @@ repo = "https://github.com/yarnpkg/berry"
 description = "Node.js package manager"
 
 [detect]
-files = ["yarn.lock", ".yarnrc.yml", ".yarnrc"]
+files = ["yarn.lock", ".yarnrc.yml", ".yarnrc", ".pnp.cjs"]
 ecosystems = ["node"]
 
 [commands]

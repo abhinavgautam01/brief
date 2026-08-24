@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"runtime/debug"
@@ -232,6 +233,10 @@ func listTools(knowledgeBase *kb.KnowledgeBase) {
 }
 
 func listToolsReadme(knowledgeBase *kb.KnowledgeBase) {
+	writeToolsReadme(os.Stdout, knowledgeBase)
+}
+
+func writeToolsReadme(out io.Writer, knowledgeBase *kb.KnowledgeBase) {
 	// Group tools by category, deduplicating names.
 	seen := make(map[string]map[string]bool)
 	byCategory := make(map[string][]string)
@@ -255,24 +260,17 @@ func listToolsReadme(knowledgeBase *kb.KnowledgeBase) {
 
 	languages := byCategory["language"]
 
-	ecosystems := knowledgeBase.AllEcosystems()
-	totalTools := 0
-	for _, names := range byCategory {
-		totalTools += len(names)
-	}
-
-	_, _ = fmt.Fprintf(os.Stdout, "## What it detects\n\n")
-	_, _ = fmt.Fprintf(os.Stdout, "%d language ecosystems with %d tool definitions across %d categories.\n\n",
-		len(ecosystems), totalTools, len(byCategory))
+	_, _ = fmt.Fprint(out, "## What it detects\n\n")
+	_, _ = fmt.Fprint(out, "Language ecosystems and development tools across multiple categories.\n\n")
 
 	// Languages
 	if len(languages) > 0 {
-		_, _ = fmt.Fprintf(os.Stdout, "**Languages:** %s.\n\n", strings.Join(languages, ", "))
+		_, _ = fmt.Fprintf(out, "**Languages:** %s.\n\n", strings.Join(languages, ", "))
 	}
 
 	// Package managers
 	if pms := byCategory["package_manager"]; len(pms) > 0 {
-		_, _ = fmt.Fprintf(os.Stdout, "**Package Managers:** %s.\n\n", strings.Join(pms, ", "))
+		_, _ = fmt.Fprintf(out, "**Package Managers:** %s.\n\n", strings.Join(pms, ", "))
 	}
 
 	// Tool categories in display order.
@@ -285,10 +283,10 @@ func listToolsReadme(knowledgeBase *kb.KnowledgeBase) {
 		if label == "" {
 			label = cat
 		}
-		_, _ = fmt.Fprintf(os.Stdout, "**%s:** %s.\n\n", label, strings.Join(names, ", "))
+		_, _ = fmt.Fprintf(out, "**%s:** %s.\n\n", label, strings.Join(names, ", "))
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "Run `brief list tools` for the full list.\n")
+	_, _ = fmt.Fprint(out, "Run `brief list tools` for the full list.\n")
 }
 
 func listEcosystems(knowledgeBase *kb.KnowledgeBase) {

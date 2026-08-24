@@ -473,6 +473,12 @@ func (e *Engine) detectCategory(category string) []brief.Detection {
 // matchTool checks if a tool definition matches the project.
 // Returns the confidence level, or empty string if no match.
 func (e *Engine) matchTool(tool *kb.ToolDef) brief.Confidence {
+	for _, pattern := range tool.Detect.ExcludeFiles {
+		if e.exists(pattern) {
+			return ""
+		}
+	}
+
 	best := brief.Confidence("")
 
 	for _, pattern := range tool.Detect.Files {

@@ -7,7 +7,7 @@ repo = "https://github.com/pantsbuild/pants"
 description = "Build system for Python and polyglot monorepos"
 
 [detect]
-files = ["pants.toml", "BUILD"]
+files = ["pants.toml"]
 ecosystems = ["python"]
 
 [commands]

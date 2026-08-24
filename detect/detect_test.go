@@ -1257,6 +1257,158 @@ func TestGradleJavaKotlinDSL(t *testing.T) {
 	}
 }
 
+func TestExpandedToolFormatDetection(t *testing.T) {
+	tests := []struct {
+		name       string
+		path       string
+		content    string
+		extraFiles map[string]string
+		category   string
+		tool       string
+	}{
+		{
+			name:       "Gradle version catalog",
+			path:       "gradle/libs.versions.toml",
+			content:    "[versions]\n",
+			extraFiles: map[string]string{"Main.java": "class Main {}\n"},
+			category:   "package_manager",
+			tool:       "Gradle",
+		},
+		{
+			name:       "NuGet central packages",
+			path:       "Directory.Packages.props",
+			content:    "<Project />\n",
+			extraFiles: map[string]string{"Program.cs": "class Program {}\n"},
+			category:   "package_manager",
+			tool:       "NuGet",
+		},
+		{
+			name:       "NuGet shared build properties",
+			path:       "Directory.Build.props",
+			content:    "<Project />\n",
+			extraFiles: map[string]string{"Program.cs": "class Program {}\n"},
+			category:   "package_manager",
+			tool:       "NuGet",
+		},
+		{
+			name:     "Helm chart lock",
+			path:     "Chart.lock",
+			content:  "dependencies: []\n",
+			category: "infrastructure",
+			tool:     "Helm",
+		},
+		{
+			name:     "Helm legacy requirements",
+			path:     "requirements.yaml",
+			content:  "dependencies: []\n",
+			category: "infrastructure",
+			tool:     "Helm",
+		},
+		{
+			name:     "Helm legacy requirements lock",
+			path:     "requirements.lock",
+			content:  "dependencies: []\n",
+			category: "infrastructure",
+			tool:     "Helm",
+		},
+		{
+			name:       "Yarn Plug'n'Play",
+			path:       ".pnp.cjs",
+			content:    "module.exports = {};\n",
+			extraFiles: map[string]string{"package.json": "{}\n"},
+			category:   "package_manager",
+			tool:       "Yarn",
+		},
+		{
+			name:       "legacy pnpm lockfile",
+			path:       "shrinkwrap.yaml",
+			content:    "lockfileVersion: 3\n",
+			extraFiles: map[string]string{"package.json": "{}\n"},
+			category:   "package_manager",
+			tool:       "pnpm",
+		},
+		{
+			name:     "Ansible Galaxy requirements yml",
+			path:     "requirements.yml",
+			content:  "roles: []\n",
+			category: "infrastructure",
+			tool:     "Ansible",
+		},
+		{
+			name:     "Ansible Galaxy requirements yaml",
+			path:     "requirements.yaml",
+			content:  "roles: []\n",
+			category: "infrastructure",
+			tool:     "Ansible",
+		},
+		{
+			name:     "Ansible Galaxy metadata yml",
+			path:     "galaxy.yml",
+			content:  "namespace: example\n",
+			category: "infrastructure",
+			tool:     "Ansible",
+		},
+		{
+			name:     "Ansible Galaxy metadata yaml",
+			path:     "galaxy.yaml",
+			content:  "namespace: example\n",
+			category: "infrastructure",
+			tool:     "Ansible",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, dir, test.path, test.content)
+			for path, content := range test.extraFiles {
+				writeFile(t, dir, path, content)
+			}
+
+			r, err := New(loadKB(t), dir).Run()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if test.category == "package_manager" {
+				if !slices.Contains(packageManagerNames(r), test.tool) {
+					t.Errorf("expected %s package manager, got %v", test.tool, packageManagerNames(r))
+				}
+				return
+			}
+			assertToolDetected(t, r, test.category, test.tool)
+		})
+	}
+}
+
+func TestBazelBuildDoesNotConflictWithPants(t *testing.T) {
+	t.Run("Python Bazel project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, dir, "BUILD", "py_library(name = \"example\")\n")
+		writeFile(t, dir, "example.py", "VALUE = 1\n")
+
+		r, err := New(loadKB(t), dir).Run()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertToolDetected(t, r, "monorepo", "Bazel")
+		assertToolNotDetected(t, r, "monorepo", "Pants")
+	})
+
+	t.Run("Pants project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, dir, "pants.toml", "[GLOBAL]\n")
+		writeFile(t, dir, "BUILD", "python_sources()\n")
+		writeFile(t, dir, "example.py", "VALUE = 1\n")
+
+		r, err := New(loadKB(t), dir).Run()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		assertToolDetected(t, r, "monorepo", "Pants")
+		assertToolNotDetected(t, r, "monorepo", "Bazel")
+	})
+}
+
 func TestGradleJavaGroovyDSL(t *testing.T) {
 	// Regression for #84: with build.gradle in app/ and source under
 	// app/src/main/java/<pkg>/, both Java and Gradle must be detected.
@@ -2017,6 +2169,16 @@ func assertToolDetected(t *testing.T, r *brief.Report, category, name string) {
 		}
 	}
 	t.Errorf("expected %s in %s category", name, category)
+}
+
+func assertToolNotDetected(t *testing.T, r *brief.Report, category, name string) {
+	t.Helper()
+	for _, tool := range r.Tools[category] {
+		if tool.Name == name {
+			t.Errorf("did not expect %s in %s category", name, category)
+			return
+		}
+	}
 }
 
 func assertHighConfidenceToolDetected(

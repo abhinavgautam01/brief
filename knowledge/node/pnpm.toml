@@ -7,7 +7,7 @@ repo = "https://github.com/pnpm/pnpm"
 description = "Fast, disk space efficient package manager"
 
 [detect]
-files = ["pnpm-lock.yaml"]
+files = ["pnpm-lock.yaml", "shrinkwrap.yaml"]
 ecosystems = ["node"]
 
 [commands]
