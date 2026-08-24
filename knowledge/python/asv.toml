@@ -1,0 +1,23 @@
+[tool]
+name = "ASV"
+category = "test"
+homepage = "https://asv.readthedocs.io/en/stable/"
+docs = "https://asv.readthedocs.io/en/stable/"
+repo = "https://github.com/airspeed-velocity/asv"
+description = "Python benchmarking tool for tracking performance across revisions"
+
+[detect]
+files = ["asv.conf.json", "**/asv.conf.json"]
+dependencies = ["asv"]
+dev_dependencies = ["asv"]
+ecosystems = ["python"]
+
+[commands]
+run = "asv run"
+alternatives = ["asv publish", "asv preview"]
+
+[config]
+files = ["asv.conf.json", "**/asv.conf.json"]
+
+[taxonomy]
+function = ["benchmarking"]

@@ -1,0 +1,21 @@
+[tool]
+name = "Nextflow"
+category = "build"
+homepage = "https://www.nextflow.io"
+docs = "https://www.nextflow.io/docs/latest/"
+repo = "https://github.com/nextflow-io/nextflow"
+description = "Workflow system for portable data pipelines"
+
+[detect]
+files = ["nextflow.config", "main.nf", "*.nf", "**/*.nf"]
+
+[commands]
+run = "nextflow run main.nf"
+
+[config]
+files = ["nextflow.config"]
+
+[taxonomy]
+role = ["orchestrator"]
+function = ["automation"]
+domain = ["scientific-computing"]

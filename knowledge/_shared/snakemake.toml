@@ -1,0 +1,23 @@
+[tool]
+name = "Snakemake"
+category = "build"
+homepage = "https://snakemake.github.io"
+docs = "https://snakemake.readthedocs.io/en/stable/"
+repo = "https://github.com/snakemake/snakemake"
+description = "Workflow system for reproducible data analysis"
+
+[detect]
+files = ["Snakefile", "**/Snakefile", "*.smk", "**/*.smk"]
+dependencies = ["snakemake"]
+dev_dependencies = ["snakemake"]
+
+[commands]
+run = "snakemake"
+
+[config]
+files = ["Snakefile", "**/Snakefile", "*.smk", "**/*.smk"]
+
+[taxonomy]
+role = ["orchestrator"]
+function = ["automation"]
+domain = ["scientific-computing"]

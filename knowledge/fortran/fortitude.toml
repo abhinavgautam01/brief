@@ -1,0 +1,26 @@
+[tool]
+name = "Fortitude"
+category = "lint"
+homepage = "https://fortitude.readthedocs.io/"
+docs = "https://fortitude.readthedocs.io/"
+repo = "https://github.com/PlasmaFAIR/fortitude"
+description = "Linter for Fortran"
+
+[detect]
+files = ["fortitude.toml", ".fortitude.toml"]
+dependencies = ["fortitude", "fortitude-lint"]
+dev_dependencies = ["fortitude", "fortitude-lint"]
+ecosystems = ["fortran"]
+[detect.key_exists]
+"fpm.toml" = ["extra.fortitude"]
+"pyproject.toml" = ["tool.fortitude"]
+
+[commands]
+run = "fortitude check"
+alternatives = ["fortitude check --fix"]
+
+[config]
+files = ["fortitude.toml", ".fortitude.toml", "fpm.toml", "pyproject.toml"]
+
+[taxonomy]
+role = ["linter"]

@@ -1,0 +1,24 @@
+[tool]
+name = "Documenter.jl"
+category = "docs"
+homepage = "https://documenter.juliadocs.org/stable/"
+docs = "https://documenter.juliadocs.org/stable/"
+repo = "https://github.com/JuliaDocs/Documenter.jl"
+description = "Documentation generator for Julia packages"
+
+[detect]
+dependencies = ["Documenter"]
+dev_dependencies = ["Documenter"]
+ecosystems = ["julia"]
+[detect.file_contains]
+"docs/Project.toml" = ["Documenter"]
+"docs/make.jl" = ["Documenter"]
+
+[commands]
+run = "julia --project=docs docs/make.jl"
+
+[config]
+files = ["docs/Project.toml", "docs/make.jl"]
+
+[taxonomy]
+function = ["documentation", "site-generation"]

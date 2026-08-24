@@ -1,0 +1,26 @@
+[tool]
+name = "renv"
+category = "package_manager"
+homepage = "https://rstudio.github.io/renv/"
+docs = "https://rstudio.github.io/renv/"
+repo = "https://github.com/rstudio/renv"
+description = "Reproducible package environments for R projects"
+
+[detect]
+files = ["renv.lock", "renv/activate.R"]
+dependencies = ["renv"]
+dev_dependencies = ["renv"]
+ecosystems = ["r"]
+[detect.file_contains]
+".Rprofile" = ["renv/activate.R", "renv::activate"]
+
+[commands]
+run = "Rscript -e 'renv::restore()'"
+alternatives = ["Rscript -e 'renv::snapshot()'"]
+
+[config]
+files = ["renv.lock", ".Rprofile", "renv/settings.json"]
+lockfile = "renv.lock"
+
+[taxonomy]
+role = ["package-manager"]

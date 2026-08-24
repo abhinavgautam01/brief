@@ -1,0 +1,26 @@
+[tool]
+name = "testthat"
+category = "test"
+homepage = "https://testthat.r-lib.org"
+docs = "https://testthat.r-lib.org"
+repo = "https://github.com/r-lib/testthat"
+description = "Testing library for R"
+
+[detect]
+files = ["tests/testthat.R", "tests/testthat/"]
+dependencies = ["testthat"]
+dev_dependencies = ["testthat"]
+ecosystems = ["r"]
+[detect.file_contains]
+"DESCRIPTION" = ["Config/testthat/"]
+
+[commands]
+run = "Rscript -e 'testthat::test_local()'"
+alternatives = ["R CMD check ."]
+
+[config]
+files = ["DESCRIPTION", "tests/testthat.R"]
+
+[taxonomy]
+role = ["testing-framework"]
+function = ["testing"]

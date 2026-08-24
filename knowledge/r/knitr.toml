@@ -1,0 +1,17 @@
+[tool]
+name = "knitr"
+category = "docs"
+homepage = "https://yihui.org/knitr/"
+docs = "https://yihui.org/knitr/"
+repo = "https://github.com/yihui/knitr"
+description = "Literate programming engine for R documents"
+
+[detect]
+dependencies = ["knitr"]
+dev_dependencies = ["knitr"]
+ecosystems = ["r"]
+[detect.file_contains]
+"DESCRIPTION" = ["VignetteBuilder: knitr"]
+
+[taxonomy]
+function = ["documentation"]

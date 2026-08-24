@@ -1,0 +1,22 @@
+[tool]
+name = "pkgdown"
+category = "docs"
+homepage = "https://pkgdown.r-lib.org"
+docs = "https://pkgdown.r-lib.org"
+repo = "https://github.com/r-lib/pkgdown"
+description = "Static documentation sites for R packages"
+
+[detect]
+files = ["_pkgdown.yml", "_pkgdown.yaml"]
+dependencies = ["pkgdown"]
+dev_dependencies = ["pkgdown"]
+ecosystems = ["r"]
+
+[commands]
+run = "Rscript -e 'pkgdown::build_site()'"
+
+[config]
+files = ["_pkgdown.yml", "_pkgdown.yaml"]
+
+[taxonomy]
+function = ["documentation", "site-generation"]

@@ -1,0 +1,15 @@
+[tool]
+name = "Runic"
+category = "format"
+homepage = "https://github.com/fredrikekre/Runic.jl"
+docs = "https://github.com/fredrikekre/Runic.jl"
+repo = "https://github.com/fredrikekre/Runic.jl"
+description = "Code formatter for Julia"
+
+[detect]
+dependencies = ["Runic", "fredrikekre/runic-action"]
+dev_dependencies = ["Runic"]
+ecosystems = ["julia"]
+
+[taxonomy]
+role = ["formatter"]

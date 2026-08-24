@@ -1,0 +1,23 @@
+[tool]
+name = "covr"
+category = "coverage"
+homepage = "https://covr.r-lib.org"
+docs = "https://covr.r-lib.org"
+repo = "https://github.com/r-lib/covr"
+description = "Test coverage reporting for R packages"
+
+[detect]
+files = [".covrignore"]
+dependencies = ["covr"]
+dev_dependencies = ["covr"]
+ecosystems = ["r"]
+
+[commands]
+run = "Rscript -e 'covr::package_coverage()'"
+alternatives = ["Rscript -e 'covr::report()'"]
+
+[config]
+files = [".covrignore"]
+
+[taxonomy]
+function = ["coverage"]
