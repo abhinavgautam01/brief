@@ -1,0 +1,21 @@
+[tool]
+name = "tinytest"
+category = "test"
+homepage = "https://github.com/markvanderloo/tinytest"
+docs = "https://cran.r-project.org/package=tinytest"
+repo = "https://github.com/markvanderloo/tinytest"
+description = "Lightweight unit testing for R packages"
+
+[detect]
+files = ["tests/tinytest.R", "inst/tinytest/"]
+dependencies = ["tinytest"]
+dev_dependencies = ["tinytest"]
+ecosystems = ["r"]
+
+[commands]
+run = "Rscript -e 'tinytest::test_all()'"
+alternatives = ["Rscript -e 'tinytest::run_test_dir(\"inst/tinytest\")'"]
+
+[taxonomy]
+role = ["testing-framework"]
+function = ["testing"]

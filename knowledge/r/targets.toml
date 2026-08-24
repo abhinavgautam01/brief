@@ -1,0 +1,26 @@
+[tool]
+name = "targets"
+category = "build"
+homepage = "https://docs.ropensci.org/targets/"
+docs = "https://books.ropensci.org/targets/"
+repo = "https://github.com/ropensci/targets"
+description = "Pipeline tool for reproducible R analyses"
+
+[detect]
+files = ["_targets.R"]
+dependencies = ["targets"]
+dev_dependencies = ["targets"]
+ecosystems = ["r"]
+
+[commands]
+run = "Rscript -e 'targets::tar_make()'"
+alternatives = ["Rscript -e 'targets::tar_visnetwork()'"]
+
+[config]
+files = ["_targets.R"]
+
+[taxonomy]
+role = ["build-tool", "orchestrator"]
+function = ["automation"]
+domain = ["data-science", "scientific-computing"]
+audience = ["data-scientist", "researcher"]

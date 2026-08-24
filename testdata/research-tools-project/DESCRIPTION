@@ -1,0 +1,8 @@
+Package: researchtools
+Version: 1.0.0
+Suggests:
+    lintr,
+    styler,
+    targets,
+    tinytest,
+    vdiffr

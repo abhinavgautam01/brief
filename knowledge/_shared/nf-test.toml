@@ -1,0 +1,23 @@
+[tool]
+name = "nf-test"
+category = "test"
+homepage = "https://www.nf-test.com"
+docs = "https://www.nf-test.com/docs/getting-started/"
+repo = "https://github.com/askimed/nf-test"
+description = "Testing tool for Nextflow pipelines"
+
+[detect]
+files = ["nf-test.config", "**/*.nf.test", "**/*.nf.test.snap"]
+
+[commands]
+run = "nf-test test"
+alternatives = ["nf-test list", "nf-test status"]
+
+[config]
+files = ["nf-test.config"]
+
+[taxonomy]
+role = ["testing-framework"]
+function = ["testing"]
+domain = ["scientific-computing"]
+audience = ["researcher"]

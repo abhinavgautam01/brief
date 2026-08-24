@@ -1,0 +1,25 @@
+[tool]
+name = "cibuildwheel"
+category = "build"
+homepage = "https://cibuildwheel.pypa.io"
+docs = "https://cibuildwheel.pypa.io/en/stable/"
+repo = "https://github.com/pypa/cibuildwheel"
+description = "Build and test Python wheels across supported platforms"
+
+[detect]
+dependencies = ["cibuildwheel"]
+dev_dependencies = ["cibuildwheel"]
+ecosystems = ["python"]
+
+[detect.key_exists]
+"pyproject.toml" = ["tool.cibuildwheel"]
+
+[commands]
+run = "cibuildwheel"
+alternatives = ["python -m cibuildwheel"]
+
+[config]
+files = ["pyproject.toml"]
+
+[taxonomy]
+role = ["build-tool"]
