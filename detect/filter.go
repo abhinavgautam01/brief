@@ -268,8 +268,8 @@ func (fc *filterContext) filterPlatforms(plat *brief.PlatformInfo, changedFiles 
 }
 
 // toolMatchesChangedFiles checks whether any changed file is relevant to a tool's
-// detection signals: config files, lockfile, detection file patterns, or
-// file_contains targets.
+// detection signals: config files, lockfile, detection or exclusion file
+// patterns, or file_contains targets.
 func toolMatchesChangedFiles(tool *kb.ToolDef, changed map[string]bool, changedExts map[string]bool) bool {
 	if matchesConfigFiles(tool, changed) {
 		return true
@@ -290,7 +290,12 @@ func matchesConfigFiles(tool *kb.ToolDef, changed map[string]bool) bool {
 }
 
 func matchesDetectionPatterns(tool *kb.ToolDef, changed map[string]bool, changedExts map[string]bool) bool {
-	for _, pattern := range tool.Detect.Files {
+	return matchesPathPatterns(tool.Detect.Files, changed, changedExts) ||
+		matchesPathPatterns(tool.Detect.ExcludeFiles, changed, changedExts)
+}
+
+func matchesPathPatterns(patterns []string, changed map[string]bool, changedExts map[string]bool) bool {
+	for _, pattern := range patterns {
 		if changed[pattern] {
 			return true
 		}

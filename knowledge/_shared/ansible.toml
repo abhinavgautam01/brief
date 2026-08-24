@@ -10,8 +10,8 @@ description = "IT automation and configuration management"
 files = ["ansible.cfg", "galaxy.yml", "galaxy.yaml", "playbooks/", "roles/", "inventory/"]
 
 [detect.file_contains]
-"requirements.yml" = ["roles:", "collections:", "- src:"]
-"requirements.yaml" = ["roles:", "collections:", "- src:"]
+"requirements.yml" = ["roles:", "collections:", "- src:", "- name:", "- include:"]
+"requirements.yaml" = ["roles:", "collections:", "- src:", "- name:", "- include:"]
 
 [commands]
 run = "ansible-playbook"

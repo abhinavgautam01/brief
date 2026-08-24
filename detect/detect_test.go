@@ -1346,6 +1346,22 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 			notTool:  "Helm",
 		},
 		{
+			name:     "Ansible Galaxy named role requirement",
+			path:     "requirements.yml",
+			content:  "- name: geerlingguy.apache\n",
+			category: "infrastructure",
+			tool:     "Ansible",
+			notTool:  "Helm",
+		},
+		{
+			name:     "Ansible Galaxy included role requirements",
+			path:     "requirements.yaml",
+			content:  "- include: requirements/common.yml\n",
+			category: "infrastructure",
+			tool:     "Ansible",
+			notTool:  "Helm",
+		},
+		{
 			name:     "Ansible Galaxy metadata yml",
 			path:     "galaxy.yml",
 			content:  "namespace: example\n",

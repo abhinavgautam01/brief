@@ -196,6 +196,22 @@ func TestToolMatchesChangedFiles_FileContainsGlob(t *testing.T) {
 	}
 }
 
+func TestFilterByChangedFiles_ExcludeFileRemoved(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "BUILD", "py_library(name = \"example\")\n")
+	writeFile(t, dir, "example.py", "VALUE = 1\n")
+
+	knowledgeBase := loadKB(t)
+	r, err := New(knowledgeBase, dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertToolDetected(t, r, "monorepo", "Bazel")
+
+	filtered := FilterByChangedFiles(r, knowledgeBase, []string{"pants.toml"})
+	assertToolDetected(t, filtered, "monorepo", "Bazel")
+}
+
 func TestFilterByChangedFiles_PackageManagers(t *testing.T) {
 	knowledgeBase := loadKB(t)
 
