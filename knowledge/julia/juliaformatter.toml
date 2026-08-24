@@ -20,3 +20,4 @@ files = [".JuliaFormatter.toml"]
 
 [taxonomy]
 role = ["formatter"]
+technology = ["julia"]

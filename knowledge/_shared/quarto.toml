@@ -19,4 +19,5 @@ alternatives = ["quarto preview"]
 files = ["_quarto.yml", "_quarto.yaml"]
 
 [taxonomy]
-function = ["documentation", "site-generation"]
+function = ["documentation", "literate-programming", "report-generation", "site-generation"]
+technology = ["quarto"]

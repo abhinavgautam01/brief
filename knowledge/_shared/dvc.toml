@@ -20,6 +20,6 @@ lockfile = "dvc.lock"
 
 [taxonomy]
 role = ["cli-tool"]
-function = ["file-management"]
+function = ["data-provenance", "data-version-control"]
 domain = ["data-science"]
 audience = ["data-scientist", "researcher"]

@@ -19,5 +19,6 @@ files = ["Snakefile", "**/Snakefile", "*.smk", "**/*.smk"]
 
 [taxonomy]
 role = ["orchestrator"]
-function = ["automation"]
-domain = ["scientific-computing"]
+function = ["workflow-orchestration"]
+domain = ["research", "scientific-computing"]
+technology = ["snakemake"]

@@ -13,4 +13,4 @@ dev_dependencies = ["rmarkdown"]
 ecosystems = ["r"]
 
 [taxonomy]
-function = ["documentation"]
+function = ["documentation", "literate-programming", "report-generation"]
