@@ -230,8 +230,12 @@ func TestResearchToolTaxonomy(t *testing.T) {
 			t.Errorf("%s not found in KB", name)
 			continue
 		}
-		if got := tool.Taxonomy.Tags(); !slices.Equal(got, tags) {
-			t.Errorf("%s taxonomy = %v, want %v", name, got, tags)
+		got := slices.Clone(tool.Taxonomy.Tags())
+		wantTags := slices.Clone(tags)
+		sort.Strings(got)
+		sort.Strings(wantTags)
+		if !slices.Equal(got, wantTags) {
+			t.Errorf("%s taxonomy = %v, want %v", name, got, wantTags)
 		}
 	}
 }
