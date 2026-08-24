@@ -77,3 +77,22 @@ VignetteBuilder: knitr
 		t.Error("expected renv package manager")
 	}
 }
+
+func TestSnakemakeSmkConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	const path = "workflow/rules/common.smk"
+	const configPattern = "**/*.smk"
+	writeProjectFile(t, dir, path, "rule all:\n    input: []\n")
+
+	report := runOn(t, dir)
+	for _, tool := range report.Tools["build"] {
+		if tool.Name != "Snakemake" {
+			continue
+		}
+		if !slices.Contains(tool.ConfigFiles, configPattern) {
+			t.Errorf("Snakemake config files = %v, want %q", tool.ConfigFiles, configPattern)
+		}
+		return
+	}
+	t.Fatal("expected Snakemake in build category")
+}
