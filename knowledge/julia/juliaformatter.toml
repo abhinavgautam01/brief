@@ -1,0 +1,22 @@
+[tool]
+name = "JuliaFormatter"
+category = "format"
+homepage = "https://juliaeditorsupport.github.io/JuliaFormatter.jl/stable/"
+docs = "https://juliaeditorsupport.github.io/JuliaFormatter.jl/stable/"
+repo = "https://github.com/JuliaEditorSupport/JuliaFormatter.jl"
+description = "Code formatter for Julia"
+
+[detect]
+files = [".JuliaFormatter.toml"]
+dependencies = ["JuliaFormatter"]
+dev_dependencies = ["JuliaFormatter"]
+ecosystems = ["julia"]
+
+[commands]
+run = "julia -e 'using JuliaFormatter; format(\".\")'"
+
+[config]
+files = [".JuliaFormatter.toml"]
+
+[taxonomy]
+role = ["formatter"]

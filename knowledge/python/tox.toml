@@ -1,0 +1,25 @@
+[tool]
+name = "tox"
+category = "test"
+homepage = "https://tox.wiki/en/stable/"
+docs = "https://tox.wiki/en/stable/"
+repo = "https://github.com/tox-dev/tox"
+description = "Python test environment orchestrator"
+
+[detect]
+files = ["tox.ini"]
+dependencies = ["tox"]
+dev_dependencies = ["tox"]
+ecosystems = ["python"]
+[detect.key_exists]
+"pyproject.toml" = ["tool.tox"]
+
+[commands]
+run = "tox"
+
+[config]
+files = ["tox.ini", "pyproject.toml"]
+
+[taxonomy]
+role = ["orchestrator"]
+function = ["testing"]

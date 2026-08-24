@@ -1,0 +1,22 @@
+[tool]
+name = "Quarto"
+category = "docs"
+homepage = "https://quarto.org"
+docs = "https://quarto.org/docs/get-started/"
+repo = "https://github.com/quarto-dev/quarto-cli"
+description = "Scientific and technical publishing system"
+
+[detect]
+files = ["_quarto.yml", "_quarto.yaml", "*.qmd", "**/*.qmd"]
+dependencies = ["quarto", "quarto-dev/quarto-actions/setup"]
+dev_dependencies = ["quarto"]
+
+[commands]
+run = "quarto render"
+alternatives = ["quarto preview"]
+
+[config]
+files = ["_quarto.yml", "_quarto.yaml"]
+
+[taxonomy]
+function = ["documentation", "site-generation"]

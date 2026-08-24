@@ -1,0 +1,22 @@
+[tool]
+name = "Jupyter"
+category = "environment"
+homepage = "https://jupyter.org"
+docs = "https://docs.jupyter.org/en/latest/"
+repo = "https://github.com/jupyter/jupyter"
+description = "Interactive computing environment for notebook documents"
+
+[detect]
+files = ["*.ipynb", "**/*.ipynb"]
+dependencies = ["jupyter", "jupyterlab", "notebook"]
+dev_dependencies = ["jupyter", "jupyterlab", "notebook"]
+
+[commands]
+run = "jupyter lab"
+alternatives = ["jupyter notebook"]
+
+[config]
+files = ["jupyter_server_config.py", "jupyter_notebook_config.py", "jupyter_lab_config.py"]
+
+[taxonomy]
+role = ["application"]

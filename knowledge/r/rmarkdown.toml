@@ -1,0 +1,16 @@
+[tool]
+name = "R Markdown"
+category = "docs"
+homepage = "https://rmarkdown.rstudio.com"
+docs = "https://rmarkdown.rstudio.com"
+repo = "https://github.com/rstudio/rmarkdown"
+description = "Dynamic document format for R"
+
+[detect]
+files = ["*.Rmd", "**/*.Rmd"]
+dependencies = ["rmarkdown"]
+dev_dependencies = ["rmarkdown"]
+ecosystems = ["r"]
+
+[taxonomy]
+function = ["documentation"]
