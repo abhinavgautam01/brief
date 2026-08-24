@@ -1,0 +1,23 @@
+[tool]
+name = "lintr"
+category = "lint"
+homepage = "https://lintr.r-lib.org"
+docs = "https://lintr.r-lib.org/reference/"
+repo = "https://github.com/r-lib/lintr"
+description = "Static analysis and style checks for R"
+
+[detect]
+files = [".lintr", ".lintr.R"]
+dependencies = ["lintr"]
+dev_dependencies = ["lintr"]
+ecosystems = ["r"]
+
+[commands]
+run = "Rscript -e 'lintr::lint_dir()'"
+alternatives = ["Rscript -e 'lintr::lint_package()'"]
+
+[config]
+files = [".lintr", ".lintr.R"]
+
+[taxonomy]
+role = ["linter"]

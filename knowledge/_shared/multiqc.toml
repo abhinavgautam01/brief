@@ -1,0 +1,23 @@
+[tool]
+name = "MultiQC"
+category = "docs"
+homepage = "https://multiqc.info"
+docs = "https://docs.seqera.io/multiqc"
+repo = "https://github.com/MultiQC/MultiQC"
+description = "Aggregate reports for bioinformatics analyses"
+
+[detect]
+files = ["multiqc_config.yml", "multiqc_config.yaml", ".multiqc_config.yml", ".multiqc_config.yaml", "**/multiqc_config.yml", "**/multiqc_config.yaml"]
+dependencies = ["multiqc"]
+
+[commands]
+run = "multiqc ."
+
+[config]
+files = ["multiqc_config.yml", "multiqc_config.yaml", ".multiqc_config.yml", ".multiqc_config.yaml", "**/multiqc_config.yml", "**/multiqc_config.yaml"]
+
+[taxonomy]
+role = ["cli-tool"]
+function = ["visualization"]
+domain = ["scientific-computing"]
+audience = ["researcher"]

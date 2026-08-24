@@ -1,0 +1,19 @@
+[tool]
+name = "styler"
+category = "format"
+homepage = "https://styler.r-lib.org"
+docs = "https://styler.r-lib.org/reference/"
+repo = "https://github.com/r-lib/styler"
+description = "Source code formatter for R"
+
+[detect]
+dependencies = ["styler"]
+dev_dependencies = ["styler"]
+ecosystems = ["r"]
+
+[commands]
+run = "Rscript -e 'styler::style_pkg()'"
+alternatives = ["Rscript -e 'styler::style_dir()'"]
+
+[taxonomy]
+role = ["formatter"]

@@ -1,0 +1,25 @@
+[tool]
+name = "DVC"
+category = "infrastructure"
+homepage = "https://dvc.org"
+docs = "https://dvc.org/doc"
+repo = "https://github.com/iterative/dvc"
+description = "Version control for data and machine learning projects"
+
+[detect]
+files = ["dvc.yaml", "dvc.lock", ".dvc/config", ".dvcignore", "*.dvc", "**/*.dvc"]
+dependencies = ["dvc"]
+
+[commands]
+run = "dvc pull"
+alternatives = ["dvc repro", "dvc status"]
+
+[config]
+files = ["dvc.yaml", "dvc.lock", ".dvc/config", ".dvcignore"]
+lockfile = "dvc.lock"
+
+[taxonomy]
+role = ["cli-tool"]
+function = ["file-management"]
+domain = ["data-science"]
+audience = ["data-scientist", "researcher"]

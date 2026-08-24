@@ -1,0 +1,21 @@
+[tool]
+name = "BenchmarkTools.jl"
+category = "test"
+homepage = "https://juliaci.github.io/BenchmarkTools.jl"
+docs = "https://juliaci.github.io/BenchmarkTools.jl/stable/manual/"
+repo = "https://github.com/JuliaCI/BenchmarkTools.jl"
+description = "Benchmarking and performance tracking for Julia"
+
+[detect]
+dependencies = ["BenchmarkTools"]
+dev_dependencies = ["BenchmarkTools"]
+ecosystems = ["julia"]
+
+[detect.key_exists]
+"Project.toml" = ["deps.BenchmarkTools", "extras.BenchmarkTools", "weakdeps.BenchmarkTools"]
+
+[taxonomy]
+role = ["testing-framework"]
+function = ["benchmarking"]
+domain = ["scientific-computing"]
+audience = ["researcher"]

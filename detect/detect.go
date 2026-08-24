@@ -597,7 +597,7 @@ func (e *Engine) recursiveGlob(pattern string) bool {
 	suffix := parts[1] // e.g. "*.py"
 
 	// Use the cached extension set for simple "**/*.ext" patterns
-	if strings.HasPrefix(suffix, "*.") {
+	if strings.HasPrefix(suffix, "*.") && strings.Count(suffix, ".") == 1 {
 		ext := suffix[1:] // ".py"
 		e.loadFileExts()
 		return e.fileExts[ext] > 0

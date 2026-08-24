@@ -1,0 +1,24 @@
+[tool]
+name = "nf-core"
+category = "build"
+homepage = "https://nf-co.re"
+docs = "https://nf-co.re/docs/nf-core-tools"
+repo = "https://github.com/nf-core/tools"
+description = "Tools for creating and maintaining nf-core Nextflow pipelines"
+
+[detect]
+files = [".nf-core.yml", ".nf-core.yaml"]
+dependencies = ["nf-core"]
+
+[commands]
+run = "nf-core pipelines lint"
+alternatives = ["nf-core pipelines schema lint", "nf-core pipelines create"]
+
+[config]
+files = [".nf-core.yml", ".nf-core.yaml"]
+
+[taxonomy]
+role = ["build-tool"]
+function = ["automation"]
+domain = ["scientific-computing"]
+audience = ["researcher"]

@@ -1,0 +1,20 @@
+[tool]
+name = "Dockstore"
+category = "infrastructure"
+homepage = "https://dockstore.org"
+docs = "https://docs.dockstore.org"
+repo = "https://github.com/dockstore/dockstore"
+description = "Registry for scientific tools and workflows"
+
+[detect]
+files = [".dockstore.yml", ".dockstore.yaml", ".github/.dockstore.yml", ".github/.dockstore.yaml"]
+
+[config]
+files = [".dockstore.yml", ".dockstore.yaml", ".github/.dockstore.yml", ".github/.dockstore.yaml"]
+
+[taxonomy]
+role = ["cli-tool"]
+layer = ["infrastructure"]
+function = ["deployment"]
+domain = ["scientific-computing"]
+audience = ["researcher"]

@@ -1,0 +1,20 @@
+[tool]
+name = "MyST-Parser"
+category = "docs"
+homepage = "https://myst-parser.readthedocs.io"
+docs = "https://myst-parser.readthedocs.io/en/latest/"
+repo = "https://github.com/executablebooks/MyST-Parser"
+description = "MyST Markdown parser and Sphinx extension"
+
+[detect]
+dependencies = ["myst-parser"]
+dev_dependencies = ["myst-parser"]
+ecosystems = ["python"]
+
+[detect.file_contains]
+"conf.py" = ["myst_parser"]
+"**/conf.py" = ["myst_parser"]
+
+[taxonomy]
+role = ["library"]
+function = ["documentation"]
