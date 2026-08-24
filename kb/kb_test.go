@@ -203,6 +203,43 @@ func TestRailsHasTaxonomy(t *testing.T) {
 	}
 }
 
+func TestResearchToolTaxonomy(t *testing.T) {
+	base := loadKB(t)
+	want := map[string][]string{
+		"Jupyter":           {"role:application", "function:interactive-computing", "function:literate-programming", "technology:jupyter"},
+		"Quarto":            {"function:documentation", "function:literate-programming", "function:report-generation", "function:site-generation", "technology:quarto"},
+		"Nextflow":          {"role:orchestrator", "function:workflow-orchestration", "domain:research", "domain:scientific-computing", "technology:nextflow"},
+		"Snakemake":         {"role:orchestrator", "function:workflow-orchestration", "domain:research", "domain:scientific-computing", "technology:snakemake"},
+		"nf-core":           {"role:build-tool", "function:automation", "domain:bioinformatics", "domain:scientific-computing", "audience:researcher", "technology:nextflow"},
+		"nf-test":           {"role:testing-framework", "function:testing", "domain:scientific-computing", "audience:researcher", "technology:nextflow"},
+		"MultiQC":           {"role:cli-tool", "function:report-generation", "function:visualization", "domain:bioinformatics", "domain:scientific-computing", "audience:researcher"},
+		"Dockstore":         {"role:registry", "layer:infrastructure", "domain:scientific-computing", "audience:researcher"},
+		"DVC":               {"role:cli-tool", "function:data-provenance", "function:data-version-control", "domain:data-science", "audience:data-scientist", "audience:researcher"},
+		"BenchmarkTools.jl": {"role:testing-framework", "function:benchmarking", "domain:scientific-computing", "audience:researcher", "technology:julia"},
+		"Documenter.jl":     {"function:documentation", "function:site-generation", "technology:julia"},
+		"JuliaFormatter":    {"role:formatter", "technology:julia"},
+		"Runic":             {"role:formatter", "technology:julia"},
+		"Fortitude":         {"role:linter", "technology:fortran"},
+		"targets":           {"role:build-tool", "role:orchestrator", "function:workflow-orchestration", "domain:data-science", "domain:research", "domain:scientific-computing", "audience:data-scientist", "audience:researcher"},
+		"R Markdown":        {"function:documentation", "function:literate-programming", "function:report-generation"},
+		"knitr":             {"function:documentation", "function:literate-programming", "function:report-generation"},
+	}
+	for name, tags := range want {
+		tool := base.ByName[name]
+		if tool == nil {
+			t.Errorf("%s not found in KB", name)
+			continue
+		}
+		got := slices.Clone(tool.Taxonomy.Tags())
+		wantTags := slices.Clone(tags)
+		sort.Strings(got)
+		sort.Strings(wantTags)
+		if !slices.Equal(got, wantTags) {
+			t.Errorf("%s taxonomy = %v, want %v", name, got, wantTags)
+		}
+	}
+}
+
 func TestPriorityNicheLanguagesHaveSinks(t *testing.T) {
 	base := loadKB(t)
 	for _, name := range []string{

@@ -13,3 +13,4 @@ ecosystems = ["julia"]
 
 [taxonomy]
 role = ["formatter"]
+technology = ["julia"]

@@ -22,3 +22,4 @@ files = ["docs/Project.toml", "docs/make.jl"]
 
 [taxonomy]
 function = ["documentation", "site-generation"]
+technology = ["julia"]

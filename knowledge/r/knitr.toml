@@ -14,4 +14,4 @@ ecosystems = ["r"]
 "DESCRIPTION" = ["VignetteBuilder: knitr"]
 
 [taxonomy]
-function = ["documentation"]
+function = ["documentation", "literate-programming", "report-generation"]

@@ -20,3 +20,5 @@ files = ["jupyter_server_config.py", "jupyter_notebook_config.py", "jupyter_lab_
 
 [taxonomy]
 role = ["application"]
+function = ["interactive-computing", "literate-programming"]
+technology = ["jupyter"]

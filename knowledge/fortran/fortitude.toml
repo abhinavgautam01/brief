@@ -24,3 +24,4 @@ files = ["fortitude.toml", ".fortitude.toml", "fpm.toml", "pyproject.toml"]
 
 [taxonomy]
 role = ["linter"]
+technology = ["fortran"]

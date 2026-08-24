@@ -17,5 +17,6 @@ files = ["nextflow.config"]
 
 [taxonomy]
 role = ["orchestrator"]
-function = ["automation"]
-domain = ["scientific-computing"]
+function = ["workflow-orchestration"]
+domain = ["research", "scientific-computing"]
+technology = ["nextflow"]

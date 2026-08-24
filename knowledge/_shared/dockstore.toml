@@ -13,8 +13,7 @@ files = [".dockstore.yml", ".dockstore.yaml", ".github/.dockstore.yml", ".github
 files = [".dockstore.yml", ".dockstore.yaml", ".github/.dockstore.yml", ".github/.dockstore.yaml"]
 
 [taxonomy]
-role = ["cli-tool"]
+role = ["registry"]
 layer = ["infrastructure"]
-function = ["deployment"]
 domain = ["scientific-computing"]
 audience = ["researcher"]

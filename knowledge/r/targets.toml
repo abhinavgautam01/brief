@@ -21,6 +21,6 @@ files = ["_targets.R"]
 
 [taxonomy]
 role = ["build-tool", "orchestrator"]
-function = ["automation"]
-domain = ["data-science", "scientific-computing"]
+function = ["workflow-orchestration"]
+domain = ["data-science", "research", "scientific-computing"]
 audience = ["data-scientist", "researcher"]
