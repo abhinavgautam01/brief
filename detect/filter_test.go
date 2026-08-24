@@ -196,6 +196,37 @@ func TestToolMatchesChangedFiles_FileContainsGlob(t *testing.T) {
 	}
 }
 
+func TestToolMatchesChangedFiles_ExcludeFileContains(t *testing.T) {
+	tool := &kb.ToolDef{
+		Detect: kb.DetectInfo{
+			Files: []string{"BUILD"},
+			ExcludeFileContains: map[string][]string{
+				"requirements.yaml": {"dependencies:"},
+			},
+		},
+	}
+	changed := map[string]bool{"requirements.yaml": true}
+	if !toolMatchesChangedFiles(tool, changed, nil) {
+		t.Error("expected exclusion content target to match changed file")
+	}
+}
+
+func TestFilterByChangedFiles_ExcludeFileRemoved(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "BUILD", "py_library(name = \"example\")\n")
+	writeFile(t, dir, "example.py", "VALUE = 1\n")
+
+	knowledgeBase := loadKB(t)
+	r, err := New(knowledgeBase, dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertToolDetected(t, r, "monorepo", "Bazel")
+
+	filtered := FilterByChangedFiles(r, knowledgeBase, []string{"pants.toml"})
+	assertToolDetected(t, filtered, "monorepo", "Bazel")
+}
+
 func TestFilterByChangedFiles_PackageManagers(t *testing.T) {
 	knowledgeBase := loadKB(t)
 

@@ -35,12 +35,14 @@ type ToolInfo struct {
 
 // DetectInfo holds the detection primitives for a tool.
 type DetectInfo struct {
-	Files           []string            `toml:"files"`
-	Dependencies    []string            `toml:"dependencies"`
-	DevDependencies []string            `toml:"dev_dependencies"`
-	FileContains    map[string][]string `toml:"file_contains"`
-	KeyExists       map[string][]string `toml:"key_exists"`
-	Ecosystems      []string            `toml:"ecosystems"`
+	Files               []string            `toml:"files"`
+	ExcludeFiles        []string            `toml:"exclude_files"`
+	Dependencies        []string            `toml:"dependencies"`
+	DevDependencies     []string            `toml:"dev_dependencies"`
+	FileContains        map[string][]string `toml:"file_contains"`
+	ExcludeFileContains map[string][]string `toml:"exclude_file_contains"`
+	KeyExists           map[string][]string `toml:"key_exists"`
+	Ecosystems          []string            `toml:"ecosystems"`
 }
 
 // CommandInfo holds the commands associated with a tool.
