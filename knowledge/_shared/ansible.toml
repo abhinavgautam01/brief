@@ -7,7 +7,11 @@ repo = "https://github.com/ansible/ansible"
 description = "IT automation and configuration management"
 
 [detect]
-files = ["ansible.cfg", "requirements.yml", "requirements.yaml", "galaxy.yml", "galaxy.yaml", "playbooks/", "roles/", "inventory/"]
+files = ["ansible.cfg", "galaxy.yml", "galaxy.yaml", "playbooks/", "roles/", "inventory/"]
+
+[detect.file_contains]
+"requirements.yml" = ["roles:", "collections:", "- src:"]
+"requirements.yaml" = ["roles:", "collections:", "- src:"]
 
 [commands]
 run = "ansible-playbook"

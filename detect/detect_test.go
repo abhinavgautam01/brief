@@ -1265,6 +1265,7 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 		extraFiles map[string]string
 		category   string
 		tool       string
+		notTool    string
 	}{
 		{
 			name:       "Gradle version catalog",
@@ -1303,6 +1304,7 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 			content:  "dependencies: []\n",
 			category: "infrastructure",
 			tool:     "Helm",
+			notTool:  "Ansible",
 		},
 		{
 			name:     "Helm legacy requirements lock",
@@ -1333,6 +1335,7 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 			content:  "roles: []\n",
 			category: "infrastructure",
 			tool:     "Ansible",
+			notTool:  "Helm",
 		},
 		{
 			name:     "Ansible Galaxy requirements yaml",
@@ -1340,6 +1343,7 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 			content:  "roles: []\n",
 			category: "infrastructure",
 			tool:     "Ansible",
+			notTool:  "Helm",
 		},
 		{
 			name:     "Ansible Galaxy metadata yml",
@@ -1376,6 +1380,9 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 				return
 			}
 			assertToolDetected(t, r, test.category, test.tool)
+			if test.notTool != "" {
+				assertToolNotDetected(t, r, test.category, test.notTool)
+			}
 		})
 	}
 }
