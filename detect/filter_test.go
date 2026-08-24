@@ -196,6 +196,21 @@ func TestToolMatchesChangedFiles_FileContainsGlob(t *testing.T) {
 	}
 }
 
+func TestToolMatchesChangedFiles_ExcludeFileContains(t *testing.T) {
+	tool := &kb.ToolDef{
+		Detect: kb.DetectInfo{
+			Files: []string{"BUILD"},
+			ExcludeFileContains: map[string][]string{
+				"requirements.yaml": {"dependencies:"},
+			},
+		},
+	}
+	changed := map[string]bool{"requirements.yaml": true}
+	if !toolMatchesChangedFiles(tool, changed, nil) {
+		t.Error("expected exclusion content target to match changed file")
+	}
+}
+
 func TestFilterByChangedFiles_ExcludeFileRemoved(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "BUILD", "py_library(name = \"example\")\n")

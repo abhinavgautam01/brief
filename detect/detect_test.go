@@ -1301,7 +1301,7 @@ func TestExpandedToolFormatDetection(t *testing.T) {
 		{
 			name:     "Helm legacy requirements",
 			path:     "requirements.yaml",
-			content:  "dependencies: []\n",
+			content:  "dependencies:\n  - name: example\n    version: 1.0.0\n",
 			category: "infrastructure",
 			tool:     "Helm",
 			notTool:  "Ansible",
@@ -1430,6 +1430,19 @@ func TestBazelBuildDoesNotConflictWithPants(t *testing.T) {
 		assertToolDetected(t, r, "monorepo", "Pants")
 		assertToolNotDetected(t, r, "monorepo", "Bazel")
 	})
+}
+
+func TestHelmRequirementsDoesNotHideAnsibleConfig(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "requirements.yaml", "dependencies:\n  - name: example\n    version: 1.0.0\n")
+	writeFile(t, dir, "ansible.cfg", "[defaults]\n")
+
+	r, err := New(loadKB(t), dir).Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertToolDetected(t, r, "infrastructure", "Helm")
+	assertToolDetected(t, r, "infrastructure", "Ansible")
 }
 
 func TestGradleJavaGroovyDSL(t *testing.T) {

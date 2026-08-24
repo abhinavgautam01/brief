@@ -494,7 +494,7 @@ func (e *Engine) matchTool(tool *kb.ToolDef) brief.Confidence {
 	}
 
 	for file, patterns := range tool.Detect.FileContains {
-		if e.contains(file, patterns) {
+		if e.contentSignalMatches(file, patterns, tool.Detect.ExcludeFileContains[file]) {
 			best = brief.ConfidenceHigh
 		}
 	}
@@ -515,6 +515,10 @@ func (e *Engine) matchTool(tool *kb.ToolDef) brief.Confidence {
 	}
 
 	return best
+}
+
+func (e *Engine) contentSignalMatches(file string, patterns, excluded []string) bool {
+	return e.contains(file, patterns) && (len(excluded) == 0 || !e.contains(file, excluded))
 }
 
 // exists checks if a file, directory, or glob pattern matches something at the project root.

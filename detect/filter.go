@@ -324,7 +324,20 @@ func matchesPathPatterns(patterns []string, changed map[string]bool, changedExts
 }
 
 func matchesContentTargets(tool *kb.ToolDef, changed map[string]bool) bool {
-	for pattern := range tool.Detect.FileContains {
+	if matchesContentPatterns(tool.Detect.FileContains, changed) ||
+		matchesContentPatterns(tool.Detect.ExcludeFileContains, changed) {
+		return true
+	}
+	for file := range tool.Detect.KeyExists {
+		if changed[file] {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesContentPatterns(patterns map[string][]string, changed map[string]bool) bool {
+	for pattern := range patterns {
 		if changed[pattern] {
 			return true
 		}
@@ -334,11 +347,6 @@ func matchesContentTargets(tool *kb.ToolDef, changed map[string]bool) bool {
 					return true
 				}
 			}
-		}
-	}
-	for file := range tool.Detect.KeyExists {
-		if changed[file] {
-			return true
 		}
 	}
 	return false

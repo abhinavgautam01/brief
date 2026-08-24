@@ -13,6 +13,10 @@ files = ["ansible.cfg", "galaxy.yml", "galaxy.yaml", "playbooks/", "roles/", "in
 "requirements.yml" = ["roles:", "collections:", "- src:", "- name:", "- include:"]
 "requirements.yaml" = ["roles:", "collections:", "- src:", "- name:", "- include:"]
 
+[detect.exclude_file_contains]
+"requirements.yml" = ["dependencies:"]
+"requirements.yaml" = ["dependencies:"]
+
 [commands]
 run = "ansible-playbook"
 
