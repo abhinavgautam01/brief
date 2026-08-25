@@ -5,12 +5,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/git-pkgs/brief"
 )
 
 const scanHelperRootEnv = "BRIEF_SCAN_HELPER_ROOT"
+const diffHelperEnv = "BRIEF_DIFF_HELPER"
 
 func TestScanDefaultsBoundRecursiveDetection(t *testing.T) {
 	if root := os.Getenv(scanHelperRootEnv); root != "" {
@@ -45,6 +47,41 @@ func TestScanDefaultsBoundRecursiveDetection(t *testing.T) {
 	}
 	if !report.Stats.ScanTruncated {
 		t.Fatal("expected scan output to report the depth truncation")
+	}
+}
+
+func TestDiffAppliesScanOverrides(t *testing.T) {
+	if os.Getenv(diffHelperEnv) != "" {
+		cmdDiff([]string{"-scan-limit=-1", "HEAD"})
+		return
+	}
+
+	dir := t.TempDir()
+	writeScanFixture(t, dir, "go.mod", "module example.com/project\n\ngo 1.22\n")
+	writeScanFixture(t, dir, "main.go", "package main\n")
+	runGitFixture(t, dir, "init", "-q")
+	runGitFixture(t, dir, "add", "go.mod", "main.go")
+	runGitFixture(t, dir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "initial")
+	writeScanFixture(t, dir, "main.go", "package main\n\nfunc main() {}\n")
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestDiffAppliesScanOverrides$")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), diffHelperEnv+"=1", "PATH="+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("diff command succeeded with a negative scan limit\n%s", out)
+	}
+	if !strings.Contains(string(out), "scan limit must not be negative") {
+		t.Fatalf("diff command output = %q, want scan limit validation error", out)
+	}
+}
+
+func runGitFixture(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 }
 

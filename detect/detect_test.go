@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/git-pkgs/brief"
 	"github.com/git-pkgs/brief/kb"
@@ -883,6 +884,28 @@ func TestPackageWorkspaceMemberDependencies(t *testing.T) {
 	assertToolDetected(t, r, "library", "axios")
 }
 
+func TestPackageWorkspaceHonorsScanDepth(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "package.json", `{
+  "private": true,
+  "workspaces": ["packages/*"]
+}`)
+	writeFile(t, dir, "packages/web/package.json", `{
+  "dependencies": {
+    "axios": "^1.7.0"
+  }
+}`)
+
+	engine := New(loadKB(t), dir)
+	engine.ScanDepth = 1
+	r, err := engine.Run()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assertToolNotDetected(t, r, "library", "axios")
+}
+
 func TestPnpmWorkspaceMemberDependencies(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "package.json", `{"private": true}`)
@@ -1490,6 +1513,32 @@ func TestNewUsesDefaultScanBounds(t *testing.T) {
 	}
 }
 
+func TestRunRejectsNegativeScanBounds(t *testing.T) {
+	tests := []struct {
+		name string
+		set  func(*Engine)
+		want string
+	}{
+		{name: "depth", set: func(engine *Engine) { engine.ScanDepth = -1 }, want: "scan depth"},
+		{name: "limit", set: func(engine *Engine) { engine.ScanLimit = -1 }, want: "scan limit"},
+		{
+			name: "line count timeout",
+			set:  func(engine *Engine) { engine.LineCountTimeout = -time.Second },
+			want: "line count timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := New(loadKB(t), t.TempDir())
+			tt.set(engine)
+			if _, err := engine.Run(); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Run() error = %v, want an error containing %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestRecursiveGlobHonorsDefaultDepth(t *testing.T) {
 	dir := t.TempDir()
 	writeProjectFile(t, dir, "pipelines/example/Snakefile", "rule all:\n")
@@ -1515,12 +1564,10 @@ func TestRecursiveGlobHonorsDefaultDepth(t *testing.T) {
 
 func TestRecursiveGlobHonorsScanLimit(t *testing.T) {
 	dir := t.TempDir()
-	writeProjectFile(t, dir, "a.txt", "a\n")
-	writeProjectFile(t, dir, "b.txt", "b\n")
 	writeProjectFile(t, dir, "nested/Snakefile", "rule all:\n")
 
 	engine := New(loadKB(t), dir)
-	engine.ScanLimit = 2
+	engine.ScanLimit = 1
 	if engine.recursiveGlob("**/Snakefile") {
 		t.Fatal("did not expect a file beyond the scan entry limit")
 	}
@@ -1535,6 +1582,22 @@ func TestRecursiveGlobHonorsScanLimit(t *testing.T) {
 	unlimited.ScanLimit = 0
 	if !unlimited.recursiveGlob("**/Snakefile") {
 		t.Fatal("expected ScanLimit=0 to remove the entry bound")
+	}
+}
+
+func TestTrackedOnlyIgnoresDepthOfUntrackedDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFile(t, dir, "one/tracked.go", "package example\n")
+	writeProjectFile(t, dir, "one/two/untracked.go", "package example\n")
+
+	engine := New(loadKB(t), dir)
+	engine.ScanDepth = 1
+	engine.tracked = map[string]bool{filepath.Join("one", "tracked.go"): true}
+	engine.trackedDirs = map[string]bool{"one": true}
+	engine.loadProjectFiles()
+
+	if engine.scanDepthTruncated {
+		t.Fatal("untracked directories must not mark a tracked-only scan as depth-truncated")
 	}
 }
 

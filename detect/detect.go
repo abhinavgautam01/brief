@@ -37,6 +37,7 @@ const (
 	DefaultLineCountTimeout = 2 * time.Second
 
 	microsPerMS       = 1000.0
+	scanReadBatchSize = 128
 	cargoManifestFile = "Cargo.toml"
 	cargoLockFile     = "Cargo.lock"
 	categoryBuild     = "build"
@@ -84,6 +85,7 @@ type Engine struct {
 	cargoFound          bool
 	cargoLoaded         bool
 	projectFiles        []string
+	projectDirs         []string
 	projectFilesLoaded  bool
 	scanTruncated       bool
 	scanDepthTruncated  bool
@@ -182,7 +184,8 @@ func (e *Engine) isTracked(rel string) bool {
 
 func (e *Engine) shouldSkipDirPath(dirPath string) bool {
 	name := filepath.Base(dirPath)
-	if strings.HasPrefix(name, ".") {
+	rootGitHubDir := name == ".github" && filepath.Clean(filepath.Dir(dirPath)) == filepath.Clean(e.Root)
+	if strings.HasPrefix(name, ".") && !rootGitHubDir {
 		return true
 	}
 	if defaultSkipDirs[name] {
@@ -242,6 +245,9 @@ func New(knowledgeBase *kb.KnowledgeBase, root string) *Engine {
 // Run performs full detection and returns a Report.
 func (e *Engine) Run() (*brief.Report, error) {
 	start := time.Now()
+	if err := e.validateOptions(); err != nil {
+		return nil, err
+	}
 
 	abs, err := filepath.Abs(e.Root)
 	if err != nil {
@@ -318,6 +324,19 @@ func (e *Engine) Run() (*brief.Report, error) {
 	}
 
 	return report, nil
+}
+
+func (e *Engine) validateOptions() error {
+	if e.ScanDepth < 0 {
+		return fmt.Errorf("scan depth must not be negative")
+	}
+	if e.ScanLimit < 0 {
+		return fmt.Errorf("scan limit must not be negative")
+	}
+	if e.LineCountTimeout < 0 {
+		return fmt.Errorf("line count timeout must not be negative")
+	}
+	return nil
 }
 
 const selfModulePath = "github.com/git-pkgs/brief"
@@ -576,7 +595,7 @@ func (e *Engine) exists(pattern string) bool {
 
 func (e *Engine) exactFileExists(file string) bool {
 	info, err := os.Stat(filepath.Join(e.Root, filepath.FromSlash(file)))
-	return err == nil && !info.IsDir() && e.isTracked(filepath.FromSlash(file))
+	return err == nil && info.Mode().IsRegular() && e.isTracked(filepath.FromSlash(file))
 }
 
 func (e *Engine) rootCandidates(file string) []string {
@@ -598,20 +617,13 @@ func (e *Engine) rootCandidates(file string) []string {
 // globMatches reports whether a root-level glob pattern matches at least one
 // entry of the requested kind.
 func (e *Engine) globMatches(pattern string, wantDir bool) bool {
-	matches, err := filepath.Glob(filepath.Join(e.Root, pattern))
-	if err != nil {
-		return false
+	e.loadProjectFiles()
+	candidates := e.projectFiles
+	if wantDir {
+		candidates = e.projectDirs
 	}
-	for _, m := range matches {
-		info, err := os.Stat(m)
-		if err != nil || info.IsDir() != wantDir {
-			continue
-		}
-		rel, err := filepath.Rel(e.Root, m)
-		if err != nil {
-			continue
-		}
-		if e.isTracked(rel) {
+	for _, rel := range candidates {
+		if matchPathPattern(pattern, filepath.ToSlash(rel)) {
 			return true
 		}
 	}
@@ -635,46 +647,66 @@ func (e *Engine) loadProjectFiles() {
 	}
 	e.projectFilesLoaded = true
 	visited := 0
-	errDone := errors.New("done")
-	_ = filepath.WalkDir(e.Root, func(filePath string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, err := filepath.Rel(e.Root, filePath)
-		if err != nil || rel == "." {
-			return nil
-		}
-		visited++
-		if e.ScanLimit > 0 && visited > e.ScanLimit {
-			e.scanTruncated = true
-			return errDone
-		}
-		if d.IsDir() {
-			if e.shouldSkipDirPath(filePath) {
-				return filepath.SkipDir
-			}
-			if e.ScanDepth > 0 && pathDepth(rel) > e.ScanDepth {
-				e.scanDepthTruncated = true
-				return filepath.SkipDir
-			}
-			if !e.isTracked(rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-		if !e.isTracked(rel) {
-			return nil
-		}
-		e.projectFiles = append(e.projectFiles, rel)
-		return nil
-	})
+	e.scanProjectDir(e.Root, "", &visited)
 	e.scanEntries = visited
-	if e.ScanLimit > 0 {
-		e.scanEntries = min(e.scanEntries, e.ScanLimit)
+	sort.Strings(e.projectDirs)
+	sort.Strings(e.projectFiles)
+}
+
+func (e *Engine) scanProjectDir(dirPath, relDir string, visited *int) bool {
+	dir, err := os.Open(dirPath)
+	if err != nil {
+		e.scanTruncated = true
+		return false
 	}
+	defer func() { _ = dir.Close() }()
+
+	for {
+		entries, readErr := dir.ReadDir(scanReadBatchSize)
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			e.scanTruncated = true
+			return false
+		}
+		for _, entry := range entries {
+			if e.scanProjectEntry(dirPath, relDir, entry, visited) {
+				return true
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			return false
+		}
+	}
+}
+
+func (e *Engine) scanProjectEntry(dirPath, relDir string, entry os.DirEntry, visited *int) bool {
+	if e.ScanLimit > 0 && *visited >= e.ScanLimit {
+		e.scanTruncated = true
+		return true
+	}
+	*visited++
+	rel := filepath.Join(relDir, entry.Name())
+	info, err := entry.Info()
+	if err != nil {
+		e.scanTruncated = true
+		return false
+	}
+	if !info.IsDir() {
+		if info.Mode().IsRegular() && e.isTracked(rel) {
+			e.projectFiles = append(e.projectFiles, rel)
+		}
+		return false
+	}
+
+	filePath := filepath.Join(dirPath, entry.Name())
+	if e.shouldSkipDirPath(filePath) || !e.isTracked(rel) {
+		return false
+	}
+	if e.ScanDepth > 0 && pathDepth(rel) > e.ScanDepth {
+		e.scanDepthTruncated = true
+		return false
+	}
+	e.projectDirs = append(e.projectDirs, rel)
+	return e.scanProjectDir(filePath, rel, visited)
 }
 
 func pathDepth(rel string) int {
@@ -715,8 +747,18 @@ func (e *Engine) safeReadFile(file string) ([]byte, error) {
 		if !strings.HasPrefix(target, absRoot+string(filepath.Separator)) {
 			return nil, fmt.Errorf("symlink escapes project root: %s -> %s", file, target)
 		}
+		targetInfo, err := os.Stat(target)
+		if err != nil {
+			return nil, err
+		}
+		if !targetInfo.Mode().IsRegular() {
+			return nil, fmt.Errorf("path is not a regular file: %s", file)
+		}
 		// Safe symlink within root: read the resolved target directly.
 		return os.ReadFile(target)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("path is not a regular file: %s", file)
 	}
 	// Not a symlink: open with O_NOFOLLOW so a symlink swap between
 	// the Lstat and Open is rejected by the kernel.
@@ -897,13 +939,12 @@ func (e *Engine) manifestPaths() []string {
 		add(path.Join(cargoRoot, cargoLockFile))
 	}
 
-	// GitHub Actions workflow files
-	wfMatches, _ := filepath.Glob(filepath.Join(e.Root, ".github/workflows/*.yml"))
-	wfMatchesYAML, _ := filepath.Glob(filepath.Join(e.Root, ".github/workflows/*.yaml"))
-	for _, m := range append(wfMatches, wfMatchesYAML...) {
-		rel, err := filepath.Rel(e.Root, m)
-		if err == nil {
-			add(rel)
+	e.loadProjectFiles()
+	for _, rel := range e.projectFiles {
+		slashRel := filepath.ToSlash(rel)
+		if matchPathPattern(".github/workflows/*.yml", slashRel) ||
+			matchPathPattern(".github/workflows/*.yaml", slashRel) {
+			add(slashRel)
 		}
 	}
 
@@ -997,7 +1038,9 @@ func (e *Engine) addGoWorkspaceManifests(add func(string)) {
 		return
 	}
 	for _, member := range parseGoWorkUsePaths(string(data)) {
-		add(path.Join(member, "go.mod"))
+		for _, dir := range e.expandWorkspacePattern(member) {
+			add(path.Join(dir, "go.mod"))
+		}
 	}
 }
 
@@ -1164,30 +1207,14 @@ func (e *Engine) expandWorkspacePatternFrom(base, pattern string) []string {
 	if base != "" {
 		pattern = path.Join(base, pattern)
 	}
-	// filepath.Glob does not implement recursive doublestar matching: `**`
-	// behaves like `*`, so workspace patterns such as packages/** only match
-	// one directory segment.
-	matches, err := filepath.Glob(filepath.Join(e.Root, filepath.FromSlash(pattern)))
-	if err != nil || len(matches) == 0 {
-		return []string{pattern}
-	}
+	e.loadProjectFiles()
 	var dirs []string
-	for _, match := range matches {
-		info, err := os.Stat(match)
-		if err != nil || !info.IsDir() {
-			continue
+	for _, rel := range e.projectDirs {
+		slashRel := filepath.ToSlash(rel)
+		if matchPathPattern(pattern, slashRel) {
+			dirs = append(dirs, slashRel)
 		}
-		rel, err := filepath.Rel(e.Root, match)
-		if err != nil {
-			continue
-		}
-		rel = filepath.ToSlash(filepath.Clean(rel))
-		if rel == "." || strings.HasPrefix(rel, "../") {
-			continue
-		}
-		dirs = append(dirs, rel)
 	}
-	sort.Strings(dirs)
 	return dirs
 }
 
@@ -2161,7 +2188,7 @@ func (e *Engine) detectLineCount(absPath string) *brief.LineCount {
 }
 
 func (e *Engine) lineCounterOutput(name string, args ...string) ([]byte, bool, error) {
-	if e.LineCountTimeout <= 0 {
+	if e.LineCountTimeout == 0 {
 		out, err := exec.Command(name, args...).Output()
 		return out, false, err
 	}

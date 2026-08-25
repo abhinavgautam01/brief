@@ -165,6 +165,7 @@ func TestValidateRejectsUnsafePathPatterns(t *testing.T) {
 		{name: "multiple doublestars", pattern: "one/**/two/**/file.toml"},
 		{name: "invalid glob", pattern: "nested/[file.toml"},
 		{name: "backslash", pattern: `nested\file.toml`},
+		{name: "root", pattern: "/"},
 	}
 
 	for _, tt := range tests {
@@ -189,6 +190,30 @@ func TestValidateRejectsBroadContentGlob(t *testing.T) {
 	}}}
 	if err := base.Validate(); err == nil {
 		t.Fatal("expected validation error for broad content glob")
+	}
+}
+
+func TestValidateRejectsContentDirectory(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			FileContains: map[string][]string{"config/": {"marker"}},
+		},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected validation error for file_contains directory")
+	}
+}
+
+func TestValidateRejectsKeyExistsGlob(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			KeyExists: map[string][]string{"**/*.json": {"scripts.test"}},
+		},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected validation error for key_exists glob")
 	}
 }
 

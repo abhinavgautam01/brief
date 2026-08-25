@@ -479,6 +479,9 @@ func validateToolPaths(tool *ToolDef) error {
 		}
 	}
 	for pattern := range tool.Detect.KeyExists {
+		if HasGlobPattern(pattern) {
+			return fmt.Errorf("%s: detect.key_exists pattern %q must name a specific file", tool.Source, pattern)
+		}
 		if err := checkAll("detect.key_exists", []string{pattern}); err != nil {
 			return err
 		}
@@ -500,6 +503,9 @@ func validateContentPath(source, field, pattern string) error {
 	if err := validatePathPattern(pattern); err != nil {
 		return fmt.Errorf("%s: %s pattern %q: %w", source, field, pattern, err)
 	}
+	if strings.HasSuffix(pattern, "/") {
+		return fmt.Errorf("%s: %s pattern %q must name a specific file", source, field, pattern)
+	}
 	if !HasGlobPattern(pattern) {
 		return nil
 	}
@@ -516,9 +522,15 @@ func validatePathPattern(pattern string) error {
 	if strings.Contains(pattern, "\\") {
 		return fmt.Errorf("must use forward slashes")
 	}
+	if path.IsAbs(pattern) {
+		return fmt.Errorf("must stay within the project root")
+	}
 	trimmed := strings.TrimSuffix(pattern, "/")
+	if trimmed == "" {
+		return fmt.Errorf("must not be empty")
+	}
 	cleaned := path.Clean(trimmed)
-	if path.IsAbs(trimmed) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return fmt.Errorf("must stay within the project root")
 	}
 	doublestar := 0
