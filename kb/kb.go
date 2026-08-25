@@ -5,11 +5,14 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 )
+
+const maxToolPathSignals = 64
 
 // ToolDef is the parsed representation of a tool TOML file.
 type ToolDef struct {
@@ -425,6 +428,9 @@ func (base *KnowledgeBase) Validate() error {
 		}
 	}
 	for _, tool := range base.Tools {
+		if err := validateToolPaths(tool); err != nil {
+			return err
+		}
 		for _, id := range tool.Security.Threats {
 			if _, ok := base.Threats[id]; !ok {
 				return fmt.Errorf("%s: [security].threats references unknown threat id %q", tool.Source, id)
@@ -435,6 +441,101 @@ func (base *KnowledgeBase) Validate() error {
 				return fmt.Errorf("%s: sink %q references unknown threat id %q", tool.Source, sink.Symbol, sink.Threat)
 			}
 		}
+	}
+	return nil
+}
+
+func validateToolPaths(tool *ToolDef) error {
+	total := len(tool.Detect.Files) + len(tool.Detect.ExcludeFiles) +
+		len(tool.Detect.FileContains) + len(tool.Detect.ExcludeFileContains) +
+		len(tool.Detect.KeyExists) + len(tool.Config.Files)
+	if tool.Config.Lockfile != "" {
+		total++
+	}
+	if total > maxToolPathSignals {
+		return fmt.Errorf("%s: %d path signals exceeds limit of %d", tool.Source, total, maxToolPathSignals)
+	}
+
+	checkAll := func(field string, patterns []string) error {
+		for _, pattern := range patterns {
+			if err := validatePathPattern(pattern); err != nil {
+				return fmt.Errorf("%s: %s pattern %q: %w", tool.Source, field, pattern, err)
+			}
+		}
+		return nil
+	}
+	if err := checkAll("detect.files", tool.Detect.Files); err != nil {
+		return err
+	}
+	if err := checkAll("detect.exclude_files", tool.Detect.ExcludeFiles); err != nil {
+		return err
+	}
+	if err := checkAll("config.files", tool.Config.Files); err != nil {
+		return err
+	}
+	if tool.Config.Lockfile != "" {
+		if err := checkAll("config.lockfile", []string{tool.Config.Lockfile}); err != nil {
+			return err
+		}
+	}
+	for pattern := range tool.Detect.KeyExists {
+		if err := checkAll("detect.key_exists", []string{pattern}); err != nil {
+			return err
+		}
+	}
+	for pattern := range tool.Detect.FileContains {
+		if err := validateContentPath(tool.Source, "detect.file_contains", pattern); err != nil {
+			return err
+		}
+	}
+	for pattern := range tool.Detect.ExcludeFileContains {
+		if err := validateContentPath(tool.Source, "detect.exclude_file_contains", pattern); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateContentPath(source, field, pattern string) error {
+	if err := validatePathPattern(pattern); err != nil {
+		return fmt.Errorf("%s: %s pattern %q: %w", source, field, pattern, err)
+	}
+	if !HasGlobPattern(pattern) {
+		return nil
+	}
+	if HasGlobPattern(path.Base(pattern)) {
+		return fmt.Errorf("%s: %s pattern %q must name a specific file", source, field, pattern)
+	}
+	return nil
+}
+
+func validatePathPattern(pattern string) error {
+	if pattern == "" {
+		return fmt.Errorf("must not be empty")
+	}
+	if strings.Contains(pattern, "\\") {
+		return fmt.Errorf("must use forward slashes")
+	}
+	trimmed := strings.TrimSuffix(pattern, "/")
+	cleaned := path.Clean(trimmed)
+	if path.IsAbs(trimmed) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return fmt.Errorf("must stay within the project root")
+	}
+	doublestar := 0
+	for _, segment := range strings.Split(trimmed, "/") {
+		if strings.Contains(segment, "**") {
+			if segment != "**" {
+				return fmt.Errorf("** must occupy a complete path segment")
+			}
+			doublestar++
+			continue
+		}
+		if _, err := path.Match(segment, segment); err != nil {
+			return fmt.Errorf("invalid glob: %w", err)
+		}
+	}
+	if doublestar > 1 {
+		return fmt.Errorf("must not contain more than one ** segment")
 	}
 	return nil
 }

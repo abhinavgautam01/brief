@@ -3,6 +3,7 @@ package detect
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,9 +29,14 @@ import (
 )
 
 const (
-	extScanFileLimit  = 10000  // max files to visit when collecting extensions
-	microsPerMS       = 1000.0 // microseconds per millisecond
-	globSplitParts    = 2      // expected parts when splitting "**/" patterns
+	// DefaultScanDepth bounds recursive detection unless the caller overrides it.
+	DefaultScanDepth = 8
+	// DefaultScanLimit bounds the filesystem entries visited by one detection run.
+	DefaultScanLimit = 10000
+	// DefaultLineCountTimeout bounds external line counters.
+	DefaultLineCountTimeout = 2 * time.Second
+
+	microsPerMS       = 1000.0
 	cargoManifestFile = "Cargo.toml"
 	cargoLockFile     = "Cargo.lock"
 	categoryBuild     = "build"
@@ -47,14 +53,16 @@ const (
 
 // Engine runs detection against a project directory.
 type Engine struct {
-	KB           *kb.KnowledgeBase
-	Root         string
-	ScanDepth    int      // optional max directory depth for recursive detection (0 = unlimited)
-	SkipDirs     []string // additional directories to skip during walks
-	TrackedOnly  bool     // only consider files tracked by git
-	filesChecked int
-	toolsChecked int
-	toolsMatched int
+	KB               *kb.KnowledgeBase
+	Root             string
+	ScanDepth        int           // optional max directory depth for recursive detection (0 = unlimited)
+	ScanLimit        int           // optional max filesystem entries per scan (0 = unlimited)
+	LineCountTimeout time.Duration // optional timeout for external line counters (0 = unlimited)
+	SkipDirs         []string      // additional directories to skip during walks
+	TrackedOnly      bool          // only consider files tracked by git
+	filesChecked     int
+	toolsChecked     int
+	toolsMatched     int
 
 	detectedEcosystems map[string]bool // ecosystems whose language was detected
 
@@ -75,6 +83,11 @@ type Engine struct {
 	cargoRoot           string // relative directory containing the primary Cargo.toml
 	cargoFound          bool
 	cargoLoaded         bool
+	projectFiles        []string
+	projectFilesLoaded  bool
+	scanTruncated       bool
+	scanDepthTruncated  bool
+	scanEntries         int
 }
 
 // sortLanguagesByFileCount reorders detected languages so the one with
@@ -217,7 +230,13 @@ func (e *Engine) depsDirHasTrackedFiles(dirPath string) bool {
 
 // New creates a detection engine for the given project root.
 func New(knowledgeBase *kb.KnowledgeBase, root string) *Engine {
-	return &Engine{KB: knowledgeBase, Root: root}
+	return &Engine{
+		KB:               knowledgeBase,
+		Root:             root,
+		ScanDepth:        DefaultScanDepth,
+		ScanLimit:        DefaultScanLimit,
+		LineCountTimeout: DefaultLineCountTimeout,
+	}
 }
 
 // Run performs full detection and returns a Report.
@@ -289,11 +308,13 @@ func (e *Engine) Run() (*brief.Report, error) {
 
 	elapsed := time.Since(start)
 	report.Stats = brief.Stats{
-		Duration:     elapsed,
-		DurationMS:   float64(elapsed.Microseconds()) / microsPerMS,
-		FilesChecked: e.filesChecked,
-		ToolsMatched: e.toolsMatched,
-		ToolsChecked: e.toolsChecked,
+		Duration:      elapsed,
+		DurationMS:    float64(elapsed.Microseconds()) / microsPerMS,
+		FilesChecked:  e.filesChecked,
+		ToolsMatched:  e.toolsMatched,
+		ToolsChecked:  e.toolsChecked,
+		ScanEntries:   e.scanEntries,
+		ScanTruncated: e.scanTruncated || e.scanDepthTruncated,
 	}
 
 	return report, nil
@@ -597,35 +618,43 @@ func (e *Engine) globMatches(pattern string, wantDir bool) bool {
 	return false
 }
 
-// recursiveGlob handles ** patterns by checking against the cached file extension set.
-// Falls back to a bounded walk if the cache isn't populated.
+// recursiveGlob matches recursive patterns against the bounded project file index.
 func (e *Engine) recursiveGlob(pattern string) bool {
-	parts := strings.SplitN(pattern, "**/", globSplitParts)
-	if len(parts) != globSplitParts {
-		return false
+	e.loadProjectFiles()
+	for _, rel := range e.projectFiles {
+		if matchPathPattern(pattern, filepath.ToSlash(rel)) {
+			return true
+		}
 	}
-	suffix := parts[1] // e.g. "*.py"
+	return false
+}
 
-	// Use the cached extension set for simple "**/*.ext" patterns
-	if strings.HasPrefix(suffix, "*.") && strings.Count(suffix, ".") == 1 {
-		ext := suffix[1:] // ".py"
-		e.loadFileExts()
-		return e.fileExts[ext] > 0
+func (e *Engine) loadProjectFiles() {
+	if e.projectFilesLoaded {
+		return
 	}
-
-	// Fall back to walk for complex patterns.
-	// Uses WalkDir to avoid following symlinks into directories.
-	root := filepath.Join(e.Root, parts[0])
-	found := false
-	errDone := errors.New("found")
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	e.projectFilesLoaded = true
+	visited := 0
+	errDone := errors.New("done")
+	_ = filepath.WalkDir(e.Root, func(filePath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		rel, _ := filepath.Rel(e.Root, path)
+		rel, err := filepath.Rel(e.Root, filePath)
+		if err != nil || rel == "." {
+			return nil
+		}
+		visited++
+		if e.ScanLimit > 0 && visited > e.ScanLimit {
+			e.scanTruncated = true
+			return errDone
+		}
 		if d.IsDir() {
-			name := d.Name()
-			if name != "." && e.shouldSkipDirPath(path) {
+			if e.shouldSkipDirPath(filePath) {
+				return filepath.SkipDir
+			}
+			if e.ScanDepth > 0 && pathDepth(rel) > e.ScanDepth {
+				e.scanDepthTruncated = true
 				return filepath.SkipDir
 			}
 			if !e.isTracked(rel) {
@@ -639,64 +668,33 @@ func (e *Engine) recursiveGlob(pattern string) bool {
 		if !e.isTracked(rel) {
 			return nil
 		}
-		matched, _ := filepath.Match(suffix, d.Name())
-		if matched {
-			found = true
-			return errDone
-		}
+		e.projectFiles = append(e.projectFiles, rel)
 		return nil
 	})
-	return found
+	e.scanEntries = visited
+	if e.ScanLimit > 0 {
+		e.scanEntries = min(e.scanEntries, e.ScanLimit)
+	}
 }
 
-// loadFileExts walks the project to collect file extension counts. Cached for
-// the lifetime of the engine. The walk is bounded by extScanFileLimit rather
-// than directory depth so that deep source layouts such as
-// app/src/main/java/<package>/ are reached; directory skips already prune the
-// expensive vendor/build directories.
-// Uses WalkDir instead of Walk to avoid following symlinks into directories.
+func pathDepth(rel string) int {
+	if rel == "" || rel == "." {
+		return 0
+	}
+	return strings.Count(filepath.Clean(rel), string(filepath.Separator)) + 1
+}
+
 func (e *Engine) loadFileExts() {
 	if e.fileExts != nil {
 		return
 	}
+	e.loadProjectFiles()
 	e.fileExts = make(map[string]int)
-	rootLen := len(e.Root)
-	seen := 0
-	errDone := errors.New("done")
-	_ = filepath.WalkDir(e.Root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel := strings.TrimPrefix(path[rootLen:], string(filepath.Separator))
-		if d.IsDir() {
-			name := d.Name()
-			if name != "." && e.shouldSkipDirPath(path) {
-				return filepath.SkipDir
-			}
-			if e.ScanDepth > 0 && strings.Count(rel, string(filepath.Separator))+1 > e.ScanDepth {
-				return filepath.SkipDir
-			}
-			if !e.isTracked(rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-		if !e.isTracked(rel) {
-			return nil
-		}
-		ext := filepath.Ext(d.Name())
-		if ext != "" {
+	for _, rel := range e.projectFiles {
+		if ext := filepath.Ext(rel); ext != "" {
 			e.fileExts[ext]++
 		}
-		seen++
-		if seen >= extScanFileLimit {
-			return errDone
-		}
-		return nil
-	})
+	}
 }
 
 // safeReadFile reads a file within the project root, rejecting symlinks
@@ -756,47 +754,17 @@ func (e *Engine) contains(file string, patterns []string) bool {
 }
 
 func (e *Engine) globContains(pattern string, contentPatterns []string) bool {
-	found := false
-	errFound := errors.New("found")
-	_ = filepath.WalkDir(e.Root, func(filePath string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	e.loadProjectFiles()
+	for _, rel := range e.projectFiles {
+		if !matchPathPattern(pattern, filepath.ToSlash(rel)) {
+			continue
 		}
-
-		rel, err := filepath.Rel(e.Root, filePath)
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if rel != "." && e.shouldSkipDirPath(filePath) {
-				return filepath.SkipDir
-			}
-			if e.ScanDepth > 0 && rel != "." &&
-				strings.Count(rel, string(filepath.Separator))+1 > e.ScanDepth {
-				return filepath.SkipDir
-			}
-			if !e.isTracked(rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !e.isTracked(rel) || !matchPathPattern(pattern, filepath.ToSlash(rel)) {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			return nil
-		}
-
 		data, err := e.safeReadFile(rel)
-		if err != nil || !containsAny(string(data), contentPatterns) {
-			return nil
+		if err == nil && containsAny(string(data), contentPatterns) {
+			return true
 		}
-		found = true
-		return errFound
-	})
-	return found
+	}
+	return false
 }
 
 func containsAny(content string, patterns []string) bool {
@@ -1003,30 +971,10 @@ func (e *Engine) cargoManifestRoot() (string, bool) {
 	}
 
 	bestDepth := 0
-	errShallowest := errors.New("found shallowest Cargo manifest")
-	_ = filepath.WalkDir(e.Root, func(filePath string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, err := filepath.Rel(e.Root, filePath)
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if rel != "." && e.shouldSkipDirPath(filePath) {
-				return filepath.SkipDir
-			}
-			if e.ScanDepth > 0 && rel != "." &&
-				strings.Count(rel, string(filepath.Separator))+1 > e.ScanDepth {
-				return filepath.SkipDir
-			}
-			if !e.isTracked(rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.Name() != cargoManifestFile || d.Type()&os.ModeSymlink != 0 || !e.isTracked(rel) {
-			return nil
+	e.loadProjectFiles()
+	for _, rel := range e.projectFiles {
+		if filepath.Base(rel) != cargoManifestFile {
+			continue
 		}
 		dir := filepath.ToSlash(filepath.Dir(rel))
 		depth := strings.Count(dir, "/") + 1
@@ -1035,11 +983,10 @@ func (e *Engine) cargoManifestRoot() (string, bool) {
 			e.cargoFound = true
 			bestDepth = depth
 			if depth == 1 {
-				return errShallowest
+				break
 			}
 		}
-		return nil
-	})
+	}
 
 	return e.cargoRoot, e.cargoFound
 }
@@ -1532,7 +1479,6 @@ func (sc *styleCounts) toStyleInfo() *brief.StyleInfo {
 }
 
 // inferStyle samples source files to detect indentation style.
-// Uses WalkDir to avoid following symlinks, and reads via safeReadFile.
 func (e *Engine) inferStyle() *brief.StyleInfo {
 	if e.KB.StyleConfig == nil {
 		return nil
@@ -1549,38 +1495,20 @@ func (e *Engine) inferStyle() *brief.StyleInfo {
 	}
 
 	var sc styleCounts
-	errDone := errors.New("done")
-	_ = filepath.WalkDir(e.Root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if name != "." && e.shouldSkipDirPath(path) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
+	e.loadProjectFiles()
+	for _, rel := range e.projectFiles {
 		if sc.sampled >= limit {
-			return errDone
+			break
 		}
-		if !exts[filepath.Ext(path)] {
-			return nil
-		}
-		rel, err := filepath.Rel(e.Root, path)
-		if err != nil {
-			return nil
+		if !exts[filepath.Ext(rel)] {
+			continue
 		}
 		data, err := e.safeReadFile(rel)
 		if err != nil {
-			return nil
+			continue
 		}
 		sc.addFile(data)
-		return nil
-	})
+	}
 
 	return sc.toStyleInfo()
 }
@@ -2208,23 +2136,39 @@ func (e *Engine) git(dir string, args ...string) ([]byte, error) {
 
 // detectLineCount gets line counts using scc or tokei if available.
 func (e *Engine) detectLineCount(absPath string) *brief.LineCount {
+	e.loadProjectFiles()
+	if e.scanTruncated || e.scanDepthTruncated {
+		return nil
+	}
+
 	// Try scc first
 	if _, err := exec.LookPath("scc"); err == nil {
-		cmd := exec.Command("scc", e.sccArgs(absPath)...)
-		if out, err := cmd.Output(); err == nil {
+		if out, timedOut, err := e.lineCounterOutput("scc", e.sccArgs(absPath)...); err == nil {
 			return parseSCCOutput(out)
+		} else if timedOut {
+			return nil
 		}
 	}
 
 	// Try tokei
 	if _, err := exec.LookPath("tokei"); err == nil {
-		cmd := exec.Command("tokei", "--output", "json", absPath)
-		if out, err := cmd.Output(); err == nil {
+		if out, _, err := e.lineCounterOutput("tokei", "--output", "json", absPath); err == nil {
 			return parseTokeiOutput(out)
 		}
 	}
 
 	return nil
+}
+
+func (e *Engine) lineCounterOutput(name string, args ...string) ([]byte, bool, error) {
+	if e.LineCountTimeout <= 0 {
+		out, err := exec.Command(name, args...).Output()
+		return out, false, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), e.LineCountTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, name, args...).Output()
+	return out, ctx.Err() != nil, err
 }
 
 func (e *Engine) sccArgs(absPath string) []string {

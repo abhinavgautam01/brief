@@ -30,6 +30,22 @@ func TestHumanLayout(t *testing.T) {
 	}
 }
 
+func TestScanTruncatedStatus(t *testing.T) {
+	r := &brief.Report{Stats: brief.Stats{ScanTruncated: true}}
+
+	var human bytes.Buffer
+	Human(&human, r, false)
+	if !strings.Contains(human.String(), "scan truncated") {
+		t.Errorf("human report missing scan status\ngot:\n%s", human.String())
+	}
+
+	var markdown bytes.Buffer
+	Markdown(&markdown, r, false)
+	if !strings.Contains(markdown.String(), "scan truncated") {
+		t.Errorf("markdown report missing scan status\ngot:\n%s", markdown.String())
+	}
+}
+
 func TestMarkdownLayout(t *testing.T) {
 	r := &brief.Report{
 		Version: "dev",

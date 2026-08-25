@@ -1477,6 +1477,67 @@ func TestScanDepthOverride(t *testing.T) {
 	}
 }
 
+func TestNewUsesDefaultScanBounds(t *testing.T) {
+	engine := New(loadKB(t), t.TempDir())
+	if engine.ScanDepth != DefaultScanDepth {
+		t.Errorf("ScanDepth = %d, want %d", engine.ScanDepth, DefaultScanDepth)
+	}
+	if engine.ScanLimit != DefaultScanLimit {
+		t.Errorf("ScanLimit = %d, want %d", engine.ScanLimit, DefaultScanLimit)
+	}
+	if engine.LineCountTimeout != DefaultLineCountTimeout {
+		t.Errorf("LineCountTimeout = %s, want %s", engine.LineCountTimeout, DefaultLineCountTimeout)
+	}
+}
+
+func TestRecursiveGlobHonorsDefaultDepth(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFile(t, dir, "pipelines/example/Snakefile", "rule all:\n")
+	deep := filepath.Join(
+		"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "asv.conf.json",
+	)
+	writeProjectFile(t, dir, deep, "{}\n")
+
+	engine := New(loadKB(t), dir)
+	if !engine.recursiveGlob("**/Snakefile") {
+		t.Fatal("expected nested Snakefile within the default depth")
+	}
+	if engine.recursiveGlob("**/asv.conf.json") {
+		t.Fatal("did not expect a file beyond the default depth")
+	}
+
+	unlimited := New(loadKB(t), dir)
+	unlimited.ScanDepth = 0
+	if !unlimited.recursiveGlob("**/asv.conf.json") {
+		t.Fatal("expected ScanDepth=0 to remove the depth bound")
+	}
+}
+
+func TestRecursiveGlobHonorsScanLimit(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFile(t, dir, "a.txt", "a\n")
+	writeProjectFile(t, dir, "b.txt", "b\n")
+	writeProjectFile(t, dir, "nested/Snakefile", "rule all:\n")
+
+	engine := New(loadKB(t), dir)
+	engine.ScanLimit = 2
+	if engine.recursiveGlob("**/Snakefile") {
+		t.Fatal("did not expect a file beyond the scan entry limit")
+	}
+	if !engine.scanTruncated {
+		t.Fatal("expected the scan to report truncation")
+	}
+	if engine.scanEntries != engine.ScanLimit {
+		t.Fatalf("scan entries = %d, want %d", engine.scanEntries, engine.ScanLimit)
+	}
+
+	unlimited := New(loadKB(t), dir)
+	unlimited.ScanLimit = 0
+	if !unlimited.recursiveGlob("**/Snakefile") {
+		t.Fatal("expected ScanLimit=0 to remove the entry bound")
+	}
+}
+
 func languageNames(r *brief.Report) []string {
 	names := make([]string, 0, len(r.Languages))
 	for _, l := range r.Languages {

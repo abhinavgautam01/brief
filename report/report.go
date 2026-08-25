@@ -108,8 +108,15 @@ func Human(w io.Writer, r *brief.Report, verbose bool) {
 	printLines(w, r.Lines)
 	printEnrichment(w, r.Enrichment)
 
-	_, _ = fmt.Fprintf(w, "\n%.1fms  %d files checked  %d/%d tools matched\n",
-		r.Stats.DurationMS, r.Stats.FilesChecked, r.Stats.ToolsMatched, r.Stats.ToolsChecked)
+	_, _ = fmt.Fprintf(w, "\n%.1fms  %d files checked  %d/%d tools matched%s\n",
+		r.Stats.DurationMS, r.Stats.FilesChecked, r.Stats.ToolsMatched, r.Stats.ToolsChecked, scanStatus(r.Stats, "  "))
+}
+
+func scanStatus(stats brief.Stats, prefix string) string {
+	if stats.ScanTruncated {
+		return prefix + "scan truncated"
+	}
+	return ""
 }
 
 func printTruncatedList(w io.Writer, header string, items []string) {

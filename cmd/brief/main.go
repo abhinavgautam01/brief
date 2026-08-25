@@ -77,7 +77,9 @@ func cmdScan(args []string) {
 	depth := fs.Int("depth", -1, "Git clone depth (0 = full clone, default shallow)")
 	dir := fs.String("dir", "", "Directory to clone remote source into")
 	cache := fs.String("cache", "", "Persistent shallow cache for HTTPS remotes (incompatible with -depth 0 and -dir)")
-	scanDepth := fs.Int("scan-depth", 0, "Max directory depth for language detection (0 = unlimited)")
+	scanDepth := fs.Int("scan-depth", detect.DefaultScanDepth, "Max directory depth for recursive detection (0 = unlimited)")
+	scanLimit := fs.Int("scan-limit", detect.DefaultScanLimit, "Max filesystem entries to scan (0 = unlimited)")
+	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
 	skip := fs.String("skip", "", "Additional directories to skip, comma-separated")
 	tracked := fs.Bool("tracked", false, "Only consider files tracked by git")
 	version := fs.Bool("version", false, "Print version and exit")
@@ -115,12 +117,21 @@ func cmdScan(args []string) {
 		os.Exit(1)
 	}
 
-	code := runScan(src.Dir, *scanDepth, *skip, *category, *tracked, *jsonFlag, *humanFlag, *markdownFlag, *verbose)
+	code := runScan(
+		src.Dir, *scanDepth, *scanLimit, *lineCountTimeout, *skip, *category,
+		*tracked, *jsonFlag, *humanFlag, *markdownFlag, *verbose,
+	)
 	src.Cleanup()
 	os.Exit(code)
 }
 
-func runScan(dir string, scanDepth int, skip, category string, tracked, jsonFlag, humanFlag, markdownFlag, verbose bool) int {
+func runScan(
+	dir string,
+	scanDepth, scanLimit int,
+	lineCountTimeout time.Duration,
+	skip, category string,
+	tracked, jsonFlag, humanFlag, markdownFlag, verbose bool,
+) int {
 	knowledgeBase, err := kb.Load(brief.KnowledgeFS)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "error loading knowledge base: %v\n", err)
@@ -129,6 +140,8 @@ func runScan(dir string, scanDepth int, skip, category string, tracked, jsonFlag
 
 	engine := detect.New(knowledgeBase, dir)
 	engine.ScanDepth = scanDepth
+	engine.ScanLimit = scanLimit
+	engine.LineCountTimeout = lineCountTimeout
 	engine.TrackedOnly = tracked
 	if skip != "" {
 		engine.SkipDirs = strings.Split(skip, ",")
