@@ -1667,6 +1667,7 @@ func TestIncludeSubmodules(t *testing.T) {
 	writeProjectFile(t, parent, "vendor/unrelated/noise.f90", "program noise\nend program noise\n")
 	gitFixtureCommand(t, parent, "add", "vendor/unrelated/noise.f90")
 	gitFixtureCommand(t, parent, "commit", "-q", "-m", "add unrelated vendor file")
+	installSubmoduleSCC(t)
 
 	without := runOn(t, parent)
 	assertToolDetected(t, without, "dependency_bot", "Git Submodules")
@@ -1674,6 +1675,9 @@ func TestIncludeSubmodules(t *testing.T) {
 		if slices.Contains(languageNames(without), name) {
 			t.Errorf("default scan included %s from a submodule or vendor directory", name)
 		}
+	}
+	if without.Lines == nil || without.Lines.Source != lineCounterSCC || without.Lines.ByLanguage["C"] != 0 {
+		t.Errorf("default line counts should exclude submodule C source, got %+v", without.Lines)
 	}
 
 	tooShallow := New(loadKB(t), parent)
@@ -1728,9 +1732,31 @@ func TestIncludeSubmodules(t *testing.T) {
 			t.Errorf("source directories = %+v, want %q", with.Layout, want)
 		}
 	}
-	if with.Lines != nil && with.Lines.Source == "scc" && with.Lines.ByLanguage["C"] == 0 {
+	if with.Lines == nil || with.Lines.Source != lineCounterSCC || with.Lines.ByLanguage["C"] == 0 {
 		t.Errorf("line counts should include submodule C source, got %+v", with.Lines)
 	}
+}
+
+func installSubmoduleSCC(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	writeProjectFile(t, dir, lineCounterSCC, `#!/bin/sh
+for arg do
+	target=$arg
+done
+case "$target" in
+	*/vendor/native)
+		printf '%s\n' '[{"Name":"C","Lines":1,"Code":1,"Count":1}]'
+		;;
+	*)
+		printf '%s\n' '[]'
+		;;
+esac
+`)
+	if err := os.Chmod(filepath.Join(dir, lineCounterSCC), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 func TestIncludeSubmodulesSkipsUninitializedCheckout(t *testing.T) {
