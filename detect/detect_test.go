@@ -1658,6 +1658,39 @@ func TestKnowledgeBaseLoads(t *testing.T) {
 	}
 }
 
+func TestGitSubmoduleManifestDependencies(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".gitmodules", `[submodule "lib/foo"]
+	path = lib/foo
+	url = https://github.com/example/foo.git
+[submodule "vendor/bar"]
+	path = vendor/bar
+	url = git@github.com:example/bar.git
+`)
+
+	report := runOn(t, dir)
+	wantManifest := brief.ManifestInfo{
+		Ecosystem: "git",
+		Path:      ".gitmodules",
+		Kind:      "manifest",
+	}
+	if !slices.Contains(report.Manifests, wantManifest) {
+		t.Errorf("manifests should contain %+v, got %+v", wantManifest, report.Manifests)
+	}
+	wantDependencies := map[string]string{
+		"lib/foo":    "pkg:git/lib%2Ffoo?repository_url=https:%2F%2Fgithub.com%2Fexample%2Ffoo.git",
+		"vendor/bar": "pkg:git/vendor%2Fbar?repository_url=git%40github.com:example%2Fbar.git",
+	}
+	for name, purl := range wantDependencies {
+		if !slices.ContainsFunc(report.Dependencies, func(dependency brief.DepInfo) bool {
+			return dependency.Name == name && dependency.PURL == purl &&
+				dependency.Scope == brief.ScopeRuntime && dependency.Direct
+		}) {
+			t.Errorf("dependencies should contain direct Git dependency %q, got %+v", name, report.Dependencies)
+		}
+	}
+}
+
 func TestNoEmptyToolNames(t *testing.T) {
 	knowledgeBase := loadKB(t)
 

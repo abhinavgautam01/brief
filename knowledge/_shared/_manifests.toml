@@ -1,5 +1,6 @@
 [manifests]
 files = [
+    ".gitmodules",
     "Gemfile",
     "Gemfile.lock",
     "package.json",
