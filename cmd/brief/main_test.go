@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 
 const scanHelperRootEnv = "BRIEF_SCAN_HELPER_ROOT"
 const diffHelperEnv = "BRIEF_DIFF_HELPER"
+const submoduleHelperRootEnv = "BRIEF_SUBMODULE_HELPER_ROOT"
 
 func TestScanDefaultsBoundRecursiveDetection(t *testing.T) {
 	if root := os.Getenv(scanHelperRootEnv); root != "" {
@@ -74,6 +76,54 @@ func TestDiffAppliesScanOverrides(t *testing.T) {
 	if !strings.Contains(string(out), "scan limit must not be negative") {
 		t.Fatalf("diff command output = %q, want scan limit validation error", out)
 	}
+}
+
+func TestScanIncludeSubmodulesFlag(t *testing.T) {
+	if root := os.Getenv(submoduleHelperRootEnv); root != "" {
+		cmdScan([]string{"-json", "-include-submodules", root})
+		return
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	native := t.TempDir()
+	initGitScanFixture(t, native)
+	writeScanFixture(t, native, "native.c", "int native(void) { return 0; }\n")
+	runGitFixture(t, native, "add", "native.c")
+	runGitFixture(t, native, "commit", "-q", "-m", "add native source")
+
+	parent := t.TempDir()
+	initGitScanFixture(t, parent)
+	writeScanFixture(t, parent, "main.py", "print('example')\n")
+	runGitFixture(t, parent, "add", "main.py")
+	runGitFixture(t, parent, "commit", "-q", "-m", "add parent source")
+	runGitFixture(t, parent, "-c", "protocol.file.allow=always", "submodule", "add", "-q", native, "vendor/native")
+	runGitFixture(t, parent, "commit", "-q", "-m", "add submodule")
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestScanIncludeSubmodulesFlag$")
+	cmd.Env = append(os.Environ(), submoduleHelperRootEnv+"="+parent)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("scan command failed: %v", err)
+	}
+
+	var report brief.Report
+	if err := json.Unmarshal(out, &report); err != nil {
+		t.Fatalf("parsing scan output: %v\n%s", err, out)
+	}
+	if !slices.ContainsFunc(report.Languages, func(language brief.Detection) bool {
+		return language.Name == "C"
+	}) {
+		t.Errorf("languages = %+v, want C from initialized submodule", report.Languages)
+	}
+}
+
+func initGitScanFixture(t *testing.T, dir string) {
+	t.Helper()
+	runGitFixture(t, dir, "init", "-q")
+	runGitFixture(t, dir, "config", "user.name", "Test")
+	runGitFixture(t, dir, "config", "user.email", "test@example.com")
 }
 
 func runGitFixture(t *testing.T, dir string, args ...string) {

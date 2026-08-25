@@ -36,6 +36,7 @@ func cmdEnrich(args []string) {
 	scanLimit := fs.Int("scan-limit", detect.DefaultScanLimit, "Max filesystem entries to scan (0 = unlimited)")
 	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
 	skip := fs.String("skip", "", "Additional directories to skip, comma-separated")
+	includeSubmodules := fs.Bool("include-submodules", false, "Include initialized Git submodule contents")
 	_ = fs.Parse(args)
 
 	path := "."
@@ -56,7 +57,7 @@ func cmdEnrich(args []string) {
 
 	code := runEnrich(
 		src.Dir, *scanDepth, *scanLimit, *lineCountTimeout, *skip,
-		*jsonFlag, *humanFlag, *markdownFlag, *verbose,
+		*includeSubmodules, *jsonFlag, *humanFlag, *markdownFlag, *verbose,
 	)
 	src.Cleanup()
 	os.Exit(code)
@@ -67,7 +68,7 @@ func runEnrich(
 	scanDepth, scanLimit int,
 	lineCountTimeout time.Duration,
 	skip string,
-	jsonFlag, humanFlag, markdownFlag, verbose bool,
+	includeSubmodules, jsonFlag, humanFlag, markdownFlag, verbose bool,
 ) int {
 	knowledgeBase, err := kb.Load(brief.KnowledgeFS)
 	if err != nil {
@@ -79,6 +80,7 @@ func runEnrich(
 	engine.ScanDepth = scanDepth
 	engine.ScanLimit = scanLimit
 	engine.LineCountTimeout = lineCountTimeout
+	engine.IncludeSubmodules = includeSubmodules
 	if skip != "" {
 		engine.SkipDirs = strings.Split(skip, ",")
 	}

@@ -34,6 +34,7 @@ func runDetection(name string, args []string) (*detect.Engine, *brief.Report, ou
 	scanLimit := fs.Int("scan-limit", detect.DefaultScanLimit, "Max filesystem entries to scan (0 = unlimited)")
 	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
 	skip := fs.String("skip", "", "Additional directories to skip, comma-separated")
+	includeSubmodules := fs.Bool("include-submodules", false, "Include initialized Git submodule contents")
 	_ = fs.Parse(args)
 
 	path := "."
@@ -51,6 +52,7 @@ func runDetection(name string, args []string) (*detect.Engine, *brief.Report, ou
 	engine.ScanDepth = *scanDepth
 	engine.ScanLimit = *scanLimit
 	engine.LineCountTimeout = *lineCountTimeout
+	engine.IncludeSubmodules = *includeSubmodules
 	if *skip != "" {
 		engine.SkipDirs = strings.Split(*skip, ",")
 	}
