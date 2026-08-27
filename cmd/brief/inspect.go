@@ -23,6 +23,7 @@ import (
 
 	"github.com/git-pkgs/archives"
 	"github.com/git-pkgs/magic"
+	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 
 	"github.com/git-pkgs/brief"
@@ -243,6 +244,17 @@ func preflightArtifactArchive(f *os.File, filePath, format string, maxEntries in
 		return preflightTAR(gz, maxEntries, maxBytes)
 	case magic.FormatBZIP2:
 		return preflightTAR(bzip2.NewReader(newArchiveInputLimitReader(f, maxArchiveInputBytes)), maxEntries, maxBytes)
+	case magic.FormatZstd:
+		zstdReader, err := zstd.NewReader(
+			newArchiveInputLimitReader(f, maxArchiveInputBytes),
+			zstd.WithDecoderConcurrency(1),
+			zstd.WithDecoderMaxMemory(uint64(maxArchiveExtractedBytes)),
+		)
+		if err != nil {
+			return fmt.Errorf("opening zstd: %w", err)
+		}
+		defer zstdReader.Close()
+		return preflightTAR(zstdReader, maxEntries, maxBytes)
 	case magic.FormatXZ:
 		if err := preflightXZ(newArchiveInputLimitReader(f, maxArchiveInputBytes), maxXZDictionaryBytes); err != nil {
 			return err
@@ -492,15 +504,20 @@ func readZIP64DirectoryEnd(r io.ReaderAt, end zipDirectoryEnd) (zipDirectoryEnd,
 }
 
 // openArtifactArchive uses the sniffed physical format instead of trusting a
-// possibly misleading filename extension. Gems need their filename for the
-// archives package to unwrap data.tar.gz; malformed gems fall back to plain
-// tar inspection.
+// possibly misleading filename extension. Gems and conda packages need their
+// filename to select the nested archive reader. Invalid nested structures fall
+// back to inspection using the physical format.
 func openArtifactArchive(f *os.File, path, format string, caseInsensitive bool) (*archiveLimitReader, error) {
 	var r archives.Reader
 	var err error
-	if format == magic.FormatTAR && strings.EqualFold(filepath.Ext(path), ".gem") {
+	ext := filepath.Ext(path)
+	if format == magic.FormatTAR && strings.EqualFold(ext, ".gem") ||
+		format == magic.FormatZIP && strings.EqualFold(ext, ".conda") {
 		r, err = archives.Open(filepath.Base(path), newArchiveInputLimitReader(f, maxArchiveInputBytes))
 		if err != nil {
+			if errors.Is(err, archives.ErrEntryLimit) || errors.Is(err, archives.ErrDecompressLimit) {
+				return nil, fmt.Errorf("%w: %w", errArchiveLimit, err)
+			}
 			r = nil
 			if _, seekErr := f.Seek(0, io.SeekStart); seekErr != nil {
 				return nil, seekErr
@@ -847,7 +864,7 @@ func isNativeObject(format string) bool {
 func isArchive(format string) bool {
 	switch format {
 	case magic.FormatZIP, magic.FormatTAR, magic.FormatGZIP,
-		magic.FormatBZIP2, magic.FormatXZ:
+		magic.FormatBZIP2, magic.FormatXZ, magic.FormatZstd:
 		return true
 	}
 	return false

@@ -22,12 +22,15 @@ import (
 
 	"github.com/git-pkgs/archives"
 	"github.com/git-pkgs/magic"
+	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 
 	"github.com/git-pkgs/brief"
 	"github.com/git-pkgs/brief/binary"
 	"github.com/git-pkgs/brief/report"
 )
+
+const inspectCondaHelperEnv = "BRIEF_INSPECT_CONDA_HELPER"
 
 func TestInspectPathBareObject(t *testing.T) {
 	bin := buildHello(t, runtime.GOOS, runtime.GOARCH)
@@ -140,6 +143,64 @@ func TestInspectPathArchive(t *testing.T) {
 	}
 	if art.NativeObjects[1].Path != "lib/hello.so" || art.NativeObjects[1].Format != "elf" {
 		t.Fatalf("NativeObjects[1] = %+v, want lib/hello.so elf", art.NativeObjects[1])
+	}
+}
+
+func TestInspectPathTarZstd(t *testing.T) {
+	bin := buildHello(t, runtime.GOOS, runtime.GOARCH)
+	archive := writeTarZstd(t, map[string]string{
+		"bin/hello":  bin,
+		"README.txt": "plain text\n",
+	})
+
+	if !shouldAutoInspect(archive) {
+		t.Fatal("zstd tar should auto-inspect")
+	}
+	art, err := inspectPath(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if art.Format != magic.FormatZstd {
+		t.Fatalf("Format = %q, want %q", art.Format, magic.FormatZstd)
+	}
+	if art.Entries != 2 {
+		t.Fatalf("Entries = %d, want 2", art.Entries)
+	}
+	if len(art.NativeObjects) != 1 || art.NativeObjects[0].Path != "bin/hello" {
+		t.Fatalf("NativeObjects = %+v, want bin/hello", art.NativeObjects)
+	}
+}
+
+func TestInspectCondaCommand(t *testing.T) {
+	if archive := os.Getenv(inspectCondaHelperEnv); archive != "" {
+		cmdInspect([]string{"-json", archive})
+		os.Exit(0)
+	}
+
+	bin := buildHello(t, runtime.GOOS, runtime.GOARCH)
+	archive := writeConda(t,
+		map[string]string{"bin/hello": bin},
+		map[string]string{"info/index.json": `{"name":"hello"}`},
+	)
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestInspectCondaCommand$")
+	cmd.Env = append(os.Environ(), inspectCondaHelperEnv+"="+archive)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("inspect command failed: %v", err)
+	}
+	var art brief.Artifact
+	if err := json.Unmarshal(out, &art); err != nil {
+		t.Fatalf("parsing inspect output: %v\n%s", err, out)
+	}
+	if art.Format != magic.FormatZIP {
+		t.Fatalf("Format = %q, want %q", art.Format, magic.FormatZIP)
+	}
+	if art.Entries != 2 {
+		t.Fatalf("Entries = %d, want 2 merged conda entries", art.Entries)
+	}
+	if len(art.NativeObjects) != 1 || art.NativeObjects[0].Path != "bin/hello" {
+		t.Fatalf("NativeObjects = %+v, want bin/hello", art.NativeObjects)
 	}
 }
 
@@ -286,6 +347,18 @@ func TestArchivePreflightLimits(t *testing.T) {
 		}
 		defer func() { _ = f.Close() }()
 		if err := preflightArtifactArchive(f, archive, magic.FormatTAR, 1, 10); !errors.Is(err, errArchiveLimit) {
+			t.Fatalf("preflightArtifactArchive error = %v, want errArchiveLimit", err)
+		}
+	})
+
+	t.Run("zstd tar entry preflight", func(t *testing.T) {
+		archive := writeTarZstd(t, map[string]string{"a": "one", "b": "two"})
+		f, err := os.Open(archive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = f.Close() }()
+		if err := preflightArtifactArchive(f, archive, magic.FormatZstd, 1, 10); !errors.Is(err, errArchiveLimit) {
 			t.Fatalf("preflightArtifactArchive error = %v, want errArchiveLimit", err)
 		}
 	})
@@ -643,6 +716,79 @@ func writeTar(tb testing.TB, entries map[string]string) string {
 		}
 	}
 	if err := tw.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	return path
+}
+
+func writeTarZstd(tb testing.TB, entries map[string]string) string {
+	tb.Helper()
+	path := filepath.Join(tb.TempDir(), "fixture.tar.zst")
+	if err := os.WriteFile(path, tarZstdData(tb, entries), 0o644); err != nil {
+		tb.Fatal(err)
+	}
+	return path
+}
+
+func tarZstdData(tb testing.TB, entries map[string]string) []byte {
+	tb.Helper()
+	var data bytes.Buffer
+	zw, err := zstd.NewWriter(&data)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	tw := tar.NewWriter(zw)
+	for name, val := range entries {
+		content := []byte(val)
+		if fileData, err := os.ReadFile(val); err == nil {
+			content = fileData
+		}
+		header := &tar.Header{Name: name, Mode: 0o644, Size: int64(len(content))}
+		if err := tw.WriteHeader(header); err != nil {
+			tb.Fatal(err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			tb.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	return data.Bytes()
+}
+
+func writeConda(tb testing.TB, packageEntries, infoEntries map[string]string) string {
+	tb.Helper()
+	path := filepath.Join(tb.TempDir(), "fixture.conda")
+	f, err := os.Create(path)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	members := []struct {
+		name string
+		data []byte
+	}{
+		{name: "metadata.json", data: []byte(`{"conda_pkg_format_version":2}`)},
+		{name: "pkg-hello-1.0-0.tar.zst", data: tarZstdData(tb, packageEntries)},
+		{name: "info-hello-1.0-0.tar.zst", data: tarZstdData(tb, infoEntries)},
+	}
+	for _, member := range members {
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: member.name, Method: zip.Store})
+		if err != nil {
+			tb.Fatal(err)
+		}
+		if _, err := w.Write(member.data); err != nil {
+			tb.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
 		tb.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
