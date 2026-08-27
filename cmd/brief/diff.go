@@ -22,6 +22,9 @@ func cmdDiff(args []string) {
 	markdownFlag := fs.Bool("markdown", false, "Force markdown output")
 	verbose := fs.Bool("verbose", false, "Include breadcrumb/reference information")
 	category := fs.String("category", "", "Only report on specific category")
+	scanDepth := fs.Int("scan-depth", detect.DefaultScanDepth, "Max directory depth for recursive detection (0 = unlimited)")
+	scanLimit := fs.Int("scan-limit", detect.DefaultScanLimit, "Max filesystem entries to scan (0 = unlimited)")
+	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
 	_ = fs.Parse(args)
 
 	// Determine the project root (git toplevel).
@@ -84,6 +87,9 @@ func cmdDiff(args []string) {
 	}()
 
 	engine := detect.New(knowledgeBase, root)
+	engine.ScanDepth = *scanDepth
+	engine.ScanLimit = *scanLimit
+	engine.LineCountTimeout = *lineCountTimeout
 	r, err := engine.Run()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)

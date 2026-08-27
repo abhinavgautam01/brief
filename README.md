@@ -70,7 +70,7 @@ brief crate:serde
 brief pypi:requests
 ```
 
-Local scans recurse through the project tree. Use `--scan-depth N` to limit recursion, `--skip dir1,dir2` to add directory exclusions, or `--tracked` to consider only files tracked by Git. When Rust source exists without a root `Cargo.toml`, brief uses the shallowest `Cargo.toml` within the scan depth as an additional manifest root. Cargo workspace member manifests are also checked for tool configuration.
+Local scans inspect up to eight directory levels and 10,000 filesystem entries by default. Use `--scan-depth N` or `--scan-limit N` to change those bounds. External line counters have a two-second limit, configurable with `--line-count-timeout D`, and reports mark truncated scans. Set any of these three values to `0` to remove that bound. Use `--skip dir1,dir2` to add directory exclusions, or `--tracked` to consider only files tracked by Git. When Rust source exists without a root `Cargo.toml`, brief uses the shallowest `Cargo.toml` within the scan depth as an additional manifest root. Cargo workspace member manifests are also checked for tool configuration.
 
 Remote sources are shallow-cloned by default. Use `--depth 0` for a full clone, `--keep` to preserve the clone, or `--dir ./somewhere` to clone into a specific directory. Use `--cache ./cache` to keep one shallow checkout per HTTPS URL and reuse it across runs. Cache mode cannot be combined with `--depth 0` or `--dir`.
 

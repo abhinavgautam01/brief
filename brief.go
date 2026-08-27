@@ -200,11 +200,13 @@ type LineCount struct {
 
 // Stats holds performance and coverage metrics from the detection run.
 type Stats struct {
-	Duration     time.Duration `json:"-"`
-	DurationMS   float64       `json:"duration_ms"`
-	FilesChecked int           `json:"files_checked"`
-	ToolsMatched int           `json:"tools_matched"`
-	ToolsChecked int           `json:"tools_checked"`
+	Duration      time.Duration `json:"-"`
+	DurationMS    float64       `json:"duration_ms"`
+	FilesChecked  int           `json:"files_checked"`
+	ToolsMatched  int           `json:"tools_matched"`
+	ToolsChecked  int           `json:"tools_checked"`
+	ScanEntries   int           `json:"scan_entries"`
+	ScanTruncated bool          `json:"scan_truncated,omitempty"`
 }
 
 // DepInfo is a parsed dependency from a manifest file.

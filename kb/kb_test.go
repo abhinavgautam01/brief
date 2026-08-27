@@ -155,6 +155,84 @@ func TestValidateRejectsUnknownExplicitThreat(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsUnsafePathPatterns(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+	}{
+		{name: "parent traversal", pattern: "../outside.toml"},
+		{name: "partial doublestar", pattern: "nested/**file.toml"},
+		{name: "multiple doublestars", pattern: "one/**/two/**/file.toml"},
+		{name: "invalid glob", pattern: "nested/[file.toml"},
+		{name: "backslash", pattern: `nested\file.toml`},
+		{name: "root", pattern: "/"},
+		{name: "relative root", pattern: "./"},
+		{name: "normalized root", pattern: "nested/../"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+				Source: "knowledge/example.toml",
+				Detect: kb.DetectInfo{Files: []string{tt.pattern}},
+			}}}
+			if err := base.Validate(); err == nil {
+				t.Fatalf("expected validation error for %q", tt.pattern)
+			}
+		})
+	}
+}
+
+func TestValidateRejectsBroadContentGlob(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			FileContains: map[string][]string{"**/*": {"marker"}},
+		},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected validation error for broad content glob")
+	}
+}
+
+func TestValidateRejectsContentDirectory(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			FileContains: map[string][]string{"config/": {"marker"}},
+		},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected validation error for file_contains directory")
+	}
+}
+
+func TestValidateRejectsKeyExistsGlob(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			KeyExists: map[string][]string{"**/*.json": {"scripts.test"}},
+		},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected validation error for key_exists glob")
+	}
+}
+
+func TestValidateRejectsExcessivePathSignals(t *testing.T) {
+	patterns := make([]string, 65)
+	for i := range patterns {
+		patterns[i] = "file.toml"
+	}
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{Files: patterns},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected validation error for excessive path signals")
+	}
+}
+
 func TestTaxonomyEmpty(t *testing.T) {
 	var empty kb.Taxonomy
 	if !empty.Empty() {

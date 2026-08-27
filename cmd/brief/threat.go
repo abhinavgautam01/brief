@@ -30,7 +30,9 @@ func runDetection(name string, args []string) (*detect.Engine, *brief.Report, ou
 	jsonFlag := fs.Bool("json", false, "Force JSON output")
 	humanFlag := fs.Bool("human", false, "Force human-readable output")
 	markdownFlag := fs.Bool("markdown", false, "Force markdown output")
-	scanDepth := fs.Int("scan-depth", 0, "Max directory depth for language detection (0 = unlimited)")
+	scanDepth := fs.Int("scan-depth", detect.DefaultScanDepth, "Max directory depth for recursive detection (0 = unlimited)")
+	scanLimit := fs.Int("scan-limit", detect.DefaultScanLimit, "Max filesystem entries to scan (0 = unlimited)")
+	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
 	skip := fs.String("skip", "", "Additional directories to skip, comma-separated")
 	_ = fs.Parse(args)
 
@@ -47,6 +49,8 @@ func runDetection(name string, args []string) (*detect.Engine, *brief.Report, ou
 
 	engine := detect.New(knowledgeBase, path)
 	engine.ScanDepth = *scanDepth
+	engine.ScanLimit = *scanLimit
+	engine.LineCountTimeout = *lineCountTimeout
 	if *skip != "" {
 		engine.SkipDirs = strings.Split(*skip, ",")
 	}

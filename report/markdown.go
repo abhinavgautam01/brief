@@ -32,8 +32,8 @@ func Markdown(w io.Writer, r *brief.Report, verbose bool) {
 	mdLines(w, r.Lines)
 	mdEnrichment(w, r.Enrichment)
 
-	_, _ = fmt.Fprintf(w, "---\n\n%.1fms | %d files checked | %d/%d tools matched\n",
-		r.Stats.DurationMS, r.Stats.FilesChecked, r.Stats.ToolsMatched, r.Stats.ToolsChecked)
+	_, _ = fmt.Fprintf(w, "---\n\n%.1fms | %d files checked | %d/%d tools matched%s\n",
+		r.Stats.DurationMS, r.Stats.FilesChecked, r.Stats.ToolsMatched, r.Stats.ToolsChecked, scanStatus(r.Stats, " | "))
 }
 
 func mdTruncatedList(w io.Writer, header string, items []string) {
