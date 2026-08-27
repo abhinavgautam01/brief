@@ -1792,7 +1792,16 @@ func installSubmoduleSCC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Link(executable, filepath.Join(dir, helperName)); err != nil {
+	helperPath := filepath.Join(dir, helperName)
+	if runtime.GOOS == "windows" {
+		data, err := os.ReadFile(executable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(helperPath, data, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	} else if err := os.Link(executable, helperPath); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(lineCounterHelperEnv, "1")
@@ -2404,13 +2413,21 @@ func TestSCCArgsResolveDepsFromRelativeRoot(t *testing.T) {
 		t.Skip("git not installed")
 	}
 
-	dir := t.TempDir()
-	gitFixtureCommand(t, dir, "init", "-q")
-	writeProjectFile(t, dir, "deps/example/lib.ex", "defmodule Example do\nend\n")
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
+	dir, err := os.MkdirTemp(cwd, "brief-relative-root-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("RemoveAll: %v", err)
+		}
+	})
+	gitFixtureCommand(t, dir, "init", "-q")
+	writeProjectFile(t, dir, "deps/example/lib.ex", "defmodule Example do\nend\n")
 	relativeRoot, err := filepath.Rel(cwd, dir)
 	if err != nil {
 		t.Fatal(err)
