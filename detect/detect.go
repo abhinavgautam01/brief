@@ -84,9 +84,6 @@ type Engine struct {
 	manifests            []brief.ManifestInfo
 	manifestPathsCache   []string
 	manifestPathsLoaded  bool
-	cargoRoot            string // relative directory containing the primary Cargo.toml
-	cargoFound           bool
-	cargoLoaded          bool
 	projectFiles         []string // broad detection candidates
 	projectDirs          []string
 	indexedFiles         []string // includes routed hidden roots

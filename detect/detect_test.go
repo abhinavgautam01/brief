@@ -1685,7 +1685,12 @@ func TestIncludeSubmodules(t *testing.T) {
 	gitFixtureCommand(t, parent, "commit", "-q", "-m", "add unrelated vendor file")
 	installSubmoduleSCC(t)
 
-	without := runOn(t, parent)
+	withoutEngine := New(loadKB(t), parent)
+	withoutEngine.LineCountTimeout = 0
+	without, err := withoutEngine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
 	assertToolDetected(t, without, "dependency_bot", "Git Submodules")
 	for _, name := range []string{"C", "Go", "Julia", "Rust", "Fortran"} {
 		if slices.Contains(languageNames(without), name) {
@@ -1699,6 +1704,7 @@ func TestIncludeSubmodules(t *testing.T) {
 	tooShallow := New(loadKB(t), parent)
 	tooShallow.IncludeSubmodules = true
 	tooShallow.ScanDepth = 1
+	tooShallow.LineCountTimeout = 0
 	shallowReport, err := tooShallow.Run()
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -1712,6 +1718,7 @@ func TestIncludeSubmodules(t *testing.T) {
 	engine := New(loadKB(t), parent)
 	engine.IncludeSubmodules = true
 	engine.ScanDepth = 5
+	engine.LineCountTimeout = 0
 	with, err := engine.Run()
 	if err != nil {
 		t.Fatalf("Run: %v", err)
