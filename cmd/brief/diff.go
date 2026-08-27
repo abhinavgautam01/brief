@@ -103,7 +103,8 @@ func cmdDiff(args []string) {
 	r.DiffCommits = commits
 	r.ChangedFiles = changedFiles
 
-	r = detect.FilterByChangedFiles(r, knowledgeBase, changedFiles)
+	filterFiles := engine.ExpandSubmoduleChanges(changedFiles)
+	r = detect.FilterByChangedFiles(r, knowledgeBase, filterFiles)
 
 	if *category != "" {
 		r = filterCategory(r, *category)

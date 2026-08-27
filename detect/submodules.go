@@ -58,7 +58,7 @@ func (e *Engine) loadSubmodulesFrom(root, parent string, seen map[string]bool) {
 		if record == "" {
 			continue
 		}
-		if e.ScanLimit > 0 && e.submoduleEntries >= e.ScanLimit {
+		if e.IncludeSubmodules && e.ScanLimit > 0 && e.submoduleEntries >= e.ScanLimit {
 			e.scanTruncated = true
 			return
 		}
@@ -73,7 +73,7 @@ func (e *Engine) loadSubmodulesFrom(root, parent string, seen map[string]bool) {
 		}
 		fullPath := filepath.Clean(filepath.Join(parent, child))
 		childRoot := filepath.Join(root, child)
-		initialized := initializedSubmoduleDir(childRoot)
+		initialized := e.IncludeSubmodules && initializedSubmoduleDir(childRoot, root)
 		e.submodules = append(e.submodules, submoduleInfo{
 			Path:        fullPath,
 			Parent:      parent,
@@ -98,13 +98,21 @@ func cleanSubmodulePath(value string) (string, bool) {
 	return cleaned, true
 }
 
-func initializedSubmoduleDir(root string) bool {
+func initializedSubmoduleDir(root, parent string) bool {
 	info, err := os.Lstat(root)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return false
 	}
-	_, err = os.Lstat(filepath.Join(root, ".git"))
-	return err == nil
+	out, err := exec.Command("git", "-C", root, "rev-parse", "--show-superproject-working-tree").Output()
+	if err != nil || strings.TrimSpace(string(out)) == "" {
+		return false
+	}
+	superproject, err := os.Stat(filepath.FromSlash(strings.TrimSpace(string(out))))
+	if err != nil {
+		return false
+	}
+	parentInfo, err := os.Stat(parent)
+	return err == nil && os.SameFile(superproject, parentInfo)
 }
 
 func (e *Engine) submoduleForPath(rel string) (submoduleInfo, bool) {
@@ -194,4 +202,32 @@ func (e *Engine) directSubmodulePaths(parent string) []string {
 	}
 	sort.Strings(paths)
 	return paths
+}
+
+// ExpandSubmoduleChanges adds scanned files beneath changed submodule roots.
+func (e *Engine) ExpandSubmoduleChanges(changedFiles []string) []string {
+	e.loadProjectFiles()
+	expanded := append([]string(nil), changedFiles...)
+	seen := make(map[string]bool, len(changedFiles))
+	for _, file := range changedFiles {
+		seen[filepath.ToSlash(filepath.Clean(filepath.FromSlash(file)))] = true
+	}
+	for _, changed := range changedFiles {
+		root := filepath.Clean(filepath.FromSlash(changed))
+		if !e.includedSubmoduleSet[root] {
+			continue
+		}
+		prefix := root + string(filepath.Separator)
+		for _, file := range e.projectFiles {
+			if !strings.HasPrefix(file, prefix) {
+				continue
+			}
+			slashFile := filepath.ToSlash(file)
+			if !seen[slashFile] {
+				seen[slashFile] = true
+				expanded = append(expanded, slashFile)
+			}
+		}
+	}
+	return expanded
 }

@@ -185,6 +185,9 @@ func (e *Engine) loadTracked(abs string) error {
 		if !submodule.Initialized {
 			continue
 		}
+		if e.ScanDepth > 0 && pathDepth(submodule.Path) > e.ScanDepth {
+			continue
+		}
 		submoduleRoot := filepath.Join(abs, submodule.Path)
 		out, err := e.git(submoduleRoot, "ls-files", "-z")
 		if err != nil {
@@ -803,6 +806,9 @@ func (e *Engine) scanProjectEntry(
 
 	filePath := filepath.Join(dirPath, entry.Name())
 	nextRouteOnly := routeOnly
+	if slices.Contains(e.SkipDirs, entry.Name()) {
+		return false
+	}
 	skipDir := e.shouldSkipDirPath(filePath)
 	if e.scanTruncated {
 		return true
@@ -2341,7 +2347,7 @@ func (e *Engine) countRoots(
 		var args []string
 		switch name {
 		case lineCounterSCC:
-			args = e.sccArgs(rootPath)
+			args = e.sccArgs(rootPath, root)
 		case "tokei":
 			args = e.tokeiArgs(rootPath, root)
 		}
@@ -2375,12 +2381,12 @@ func mergeLineCounts(total, count *brief.LineCount) *brief.LineCount {
 	return total
 }
 
-func (e *Engine) sccArgs(absPath string) []string {
-	dirs := e.lineCountExcludedDirs(absPath)
+func (e *Engine) sccArgs(absPath, root string) []string {
+	dirs := e.lineCountExcludedDirs(absPath, root)
 	return []string{"--format", "json", "--exclude-dir", strings.Join(dirs, ","), absPath}
 }
 
-func (e *Engine) lineCountExcludedDirs(absPath string) []string {
+func (e *Engine) lineCountExcludedDirs(absPath, root string) []string {
 	excluded := make(map[string]bool)
 	for dir := range defaultSkipDirs {
 		excluded[dir] = true
@@ -2394,7 +2400,8 @@ func (e *Engine) lineCountExcludedDirs(absPath string) []string {
 		excluded[dir] = true
 	}
 	depsPath := filepath.Join(absPath, "deps")
-	if info, err := os.Stat(depsPath); err == nil && info.IsDir() && e.shouldSkipDirPath(depsPath) {
+	logicalDepsPath := filepath.Join(e.Root, root, "deps")
+	if info, err := os.Stat(depsPath); err == nil && info.IsDir() && e.shouldSkipDirPath(logicalDepsPath) {
 		excluded["deps"] = true
 	}
 
@@ -2409,7 +2416,7 @@ func (e *Engine) lineCountExcludedDirs(absPath string) []string {
 func (e *Engine) tokeiArgs(absPath, root string) []string {
 	args := []string{"--output", "json"}
 	excluded := make(map[string]bool)
-	for _, dir := range e.lineCountExcludedDirs(absPath) {
+	for _, dir := range e.lineCountExcludedDirs(absPath, root) {
 		excluded[filepath.ToSlash(dir)+"/"] = true
 	}
 	for _, submodule := range e.directSubmodulePaths(root) {
