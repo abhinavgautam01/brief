@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -46,6 +47,7 @@ const (
 	categoryLint      = "lint"
 	categoryTest      = "test"
 	categoryTypecheck = "typecheck"
+	lineCounterSCC    = "scc"
 
 	rankHigh   = 3
 	rankMedium = 2
@@ -54,44 +56,49 @@ const (
 
 // Engine runs detection against a project directory.
 type Engine struct {
-	KB               *kb.KnowledgeBase
-	Root             string
-	ScanDepth        int           // optional max directory depth for recursive detection (0 = unlimited)
-	ScanLimit        int           // optional max filesystem entries per scan (0 = unlimited)
-	LineCountTimeout time.Duration // optional timeout for external line counters (0 = unlimited)
-	SkipDirs         []string      // additional directories to skip during walks
-	TrackedOnly      bool          // only consider files tracked by git
-	filesChecked     int
-	toolsChecked     int
-	toolsMatched     int
+	KB                *kb.KnowledgeBase
+	Root              string
+	ScanDepth         int           // optional max directory depth for recursive detection (0 = unlimited)
+	ScanLimit         int           // optional max filesystem entries per scan (0 = unlimited)
+	LineCountTimeout  time.Duration // optional timeout for external line counters (0 = unlimited)
+	IncludeSubmodules bool          // include initialized Git submodule contents
+	SkipDirs          []string      // additional directories to skip during walks
+	TrackedOnly       bool          // only consider files tracked by git
+	filesChecked      int
+	toolsChecked      int
+	toolsMatched      int
 
 	detectedEcosystems map[string]bool // ecosystems whose language was detected
 
 	// Lazily populated caches
-	tracked             map[string]bool // git-tracked files relative to Root, nil when TrackedOnly is off
-	trackedDirs         map[string]bool // directories that contain at least one tracked file
-	trackedDeps         map[string]bool // whether a deps directory contains git-tracked files
-	fileExts            map[string]int  // cached file extension counts in the project
-	dirCache            map[string][]string
-	depsLoaded          bool
-	runtimeDeps         map[string]bool // all runtime/unscoped dependency names
-	devDeps             map[string]bool // development/test/build dependency names
-	allDeps             map[string]bool // union of both
-	parsedDeps          []brief.DepInfo // direct dependencies with PURLs
-	manifests           []brief.ManifestInfo
-	manifestPathsCache  []string
-	manifestPathsLoaded bool
-	cargoRoot           string // relative directory containing the primary Cargo.toml
-	cargoFound          bool
-	cargoLoaded         bool
-	projectFiles        []string // broad detection candidates
-	projectDirs         []string
-	indexedFiles        []string // includes routed hidden roots
-	indexedDirs         []string
-	projectFilesLoaded  bool
-	scanTruncated       bool
-	scanDepthTruncated  bool
-	scanEntries         int
+	tracked              map[string]bool // git-tracked files relative to Root, nil when TrackedOnly is off
+	trackedDirs          map[string]bool // directories that contain at least one tracked file
+	trackedDeps          map[string]bool // whether a deps directory contains git-tracked files
+	fileExts             map[string]int  // cached file extension counts in the project
+	dirCache             map[string][]string
+	depsLoaded           bool
+	runtimeDeps          map[string]bool // all runtime/unscoped dependency names
+	devDeps              map[string]bool // development/test/build dependency names
+	allDeps              map[string]bool // union of both
+	parsedDeps           []brief.DepInfo // direct dependencies with PURLs
+	manifests            []brief.ManifestInfo
+	manifestPathsCache   []string
+	manifestPathsLoaded  bool
+	projectFiles         []string // broad detection candidates
+	projectDirs          []string
+	indexedFiles         []string // includes routed hidden roots
+	indexedDirs          []string
+	projectFilesLoaded   bool
+	submodules           []submoduleInfo
+	submodulesLoaded     bool
+	submoduleEntries     int
+	submoduleByPath      map[string]submoduleInfo
+	submoduleRoutes      map[string]bool
+	includedSubmodules   []string
+	includedSubmoduleSet map[string]bool
+	scanTruncated        bool
+	scanDepthTruncated   bool
+	scanEntries          int
 }
 
 // sortLanguagesByFileCount reorders detected languages so the one with
@@ -166,11 +173,34 @@ func (e *Engine) loadTracked(abs string) error {
 	}
 	e.tracked = make(map[string]bool)
 	e.trackedDirs = make(map[string]bool)
-	for p := range strings.SplitSeq(string(out), "\x00") {
+	e.addTrackedFiles("", out)
+	if !e.IncludeSubmodules {
+		return nil
+	}
+	e.loadSubmodules()
+	for _, submodule := range e.submodules {
+		if !submodule.Initialized {
+			continue
+		}
+		if e.ScanDepth > 0 && pathDepth(submodule.Path) > e.ScanDepth {
+			continue
+		}
+		submoduleRoot := filepath.Join(abs, submodule.Path)
+		out, err := e.git(submoduleRoot, "ls-files", "-z")
+		if err != nil {
+			continue
+		}
+		e.addTrackedFiles(submodule.Path, out)
+	}
+	return nil
+}
+
+func (e *Engine) addTrackedFiles(prefix string, output []byte) {
+	for p := range strings.SplitSeq(string(output), "\x00") {
 		if p == "" {
 			continue
 		}
-		p = filepath.FromSlash(p)
+		p = filepath.Join(prefix, filepath.FromSlash(p))
 		e.tracked[p] = true
 		for d := filepath.Dir(p); d != "."; d = filepath.Dir(d) {
 			if e.trackedDirs[d] {
@@ -179,7 +209,6 @@ func (e *Engine) loadTracked(abs string) error {
 			e.trackedDirs[d] = true
 		}
 	}
-	return nil
 }
 
 // isTracked reports whether a path relative to Root should be considered.
@@ -198,6 +227,11 @@ func (e *Engine) shouldSkipDirPath(dirPath string) bool {
 	name := filepath.Base(dirPath)
 	if strings.HasPrefix(name, ".") {
 		return true
+	}
+	if rel, err := filepath.Rel(e.Root, dirPath); err == nil {
+		if _, ok := e.submoduleForPath(rel); ok {
+			return true
+		}
 	}
 	if defaultSkipDirs[name] {
 		return true
@@ -218,7 +252,7 @@ func (e *Engine) shouldSkipDirPath(dirPath string) bool {
 
 func (e *Engine) shouldIndexHiddenRoot(dirPath string) bool {
 	name := filepath.Base(dirPath)
-	if !indexedHiddenRootDirs[name] || filepath.Clean(filepath.Dir(dirPath)) != filepath.Clean(e.Root) {
+	if !indexedHiddenRootDirs[name] || !e.isAnalysisRootPath(filepath.Dir(dirPath)) {
 		return false
 	}
 	for _, dir := range e.SkipDirs {
@@ -249,7 +283,16 @@ func (e *Engine) depsDirHasTrackedFiles(dirPath string) bool {
 	if hasTracked, ok := e.trackedDeps[rel]; ok {
 		return hasTracked
 	}
-	out, err := e.git(e.Root, "ls-files", "-z", "--", filepath.ToSlash(rel))
+	gitRoot := e.Root
+	gitRel := rel
+	if analysisRoot := e.analysisRootFor(rel); analysisRoot != "" {
+		gitRoot = filepath.Join(e.Root, analysisRoot)
+		gitRel, err = filepath.Rel(analysisRoot, rel)
+		if err != nil {
+			return true
+		}
+	}
+	out, err := e.git(gitRoot, "ls-files", "-z", "--", filepath.ToSlash(gitRel))
 	hasTracked := err != nil || len(out) > 0
 	e.trackedDeps[rel] = hasTracked
 	return hasTracked
@@ -596,8 +639,14 @@ func (e *Engine) exists(pattern string) bool {
 		if kb.HasGlobPattern(dir) {
 			return e.globMatches(dir, true)
 		}
-		info, err := os.Stat(filepath.Join(e.Root, dir))
-		return err == nil && info.IsDir() && e.isTracked(filepath.FromSlash(dir))
+		for _, root := range e.analysisRoots() {
+			candidate := filepath.Join(root, filepath.FromSlash(dir))
+			info, err := os.Stat(filepath.Join(e.Root, candidate))
+			if err == nil && info.IsDir() && e.isTracked(candidate) {
+				return true
+			}
+		}
+		return false
 	}
 
 	// Handle recursive glob patterns like "**/*.py"
@@ -624,17 +673,29 @@ func (e *Engine) exactFileExists(file string) bool {
 
 func (e *Engine) rootCandidates(file string) []string {
 	file = filepath.ToSlash(filepath.Clean(file))
-	candidates := []string{file}
+	var candidates []string
+	seen := make(map[string]bool)
+	add := func(candidate string) {
+		candidate = filepath.ToSlash(filepath.Clean(candidate))
+		if !seen[candidate] {
+			seen[candidate] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+	for _, root := range e.analysisRoots() {
+		add(path.Join(filepath.ToSlash(root), file))
+	}
 	switch file {
 	case cargoManifestFile, cargoLockFile, ".cargo/config.toml":
 	default:
 		return candidates
 	}
-	root, found := e.cargoManifestRoot()
-	if !found || root == "" {
-		return candidates
+	for _, analysisRoot := range e.analysisRoots() {
+		root, found := e.cargoManifestRootFrom(analysisRoot)
+		if found {
+			add(path.Join(filepath.ToSlash(root), file))
+		}
 	}
-	candidates = append(candidates, path.Join(root, file))
 	return candidates
 }
 
@@ -647,7 +708,7 @@ func (e *Engine) globMatches(pattern string, wantDir bool) bool {
 		candidates = e.projectDirs
 	}
 	for _, rel := range candidates {
-		if matchPathPattern(pattern, filepath.ToSlash(rel)) {
+		if e.matchesProjectPattern(pattern, rel) {
 			return true
 		}
 	}
@@ -658,7 +719,7 @@ func (e *Engine) globMatches(pattern string, wantDir bool) bool {
 func (e *Engine) recursiveGlob(pattern string) bool {
 	e.loadProjectFiles()
 	for _, rel := range e.projectFiles {
-		if matchPathPattern(pattern, filepath.ToSlash(rel)) {
+		if e.matchesProjectPattern(pattern, rel) {
 			return true
 		}
 	}
@@ -671,15 +732,16 @@ func (e *Engine) loadProjectFiles() {
 	}
 	e.projectFilesLoaded = true
 	visited := 0
-	e.scanProjectDir(e.Root, "", false, &visited)
+	e.scanProjectDir(e.Root, "", &visited, false)
 	e.scanEntries = visited
 	sort.Strings(e.indexedDirs)
 	sort.Strings(e.indexedFiles)
+	sort.Strings(e.includedSubmodules)
 	sort.Strings(e.projectDirs)
 	sort.Strings(e.projectFiles)
 }
 
-func (e *Engine) scanProjectDir(dirPath, relDir string, routeOnly bool, visited *int) bool {
+func (e *Engine) scanProjectDir(dirPath, relDir string, visited *int, routeOnly bool) bool {
 	dir, err := os.Open(dirPath)
 	if err != nil {
 		e.scanTruncated = true
@@ -694,7 +756,7 @@ func (e *Engine) scanProjectDir(dirPath, relDir string, routeOnly bool, visited 
 			return false
 		}
 		for _, entry := range entries {
-			if e.scanProjectEntry(dirPath, relDir, entry, routeOnly, visited) {
+			if e.scanProjectEntry(dirPath, relDir, entry, visited, routeOnly) {
 				return true
 			}
 		}
@@ -707,8 +769,8 @@ func (e *Engine) scanProjectDir(dirPath, relDir string, routeOnly bool, visited 
 func (e *Engine) scanProjectEntry(
 	dirPath, relDir string,
 	entry os.DirEntry,
-	routeOnly bool,
 	visited *int,
+	routeOnly bool,
 ) bool {
 	if e.ScanLimit > 0 && *visited >= e.ScanLimit {
 		e.scanTruncated = true
@@ -716,6 +778,14 @@ func (e *Engine) scanProjectEntry(
 	}
 	*visited++
 	rel := filepath.Join(relDir, entry.Name())
+	submoduleRoute := e.IncludeSubmodules && e.initializedSubmoduleRoute(rel)
+	hiddenRoute := e.indexedHiddenRoute(rel)
+	if e.scanTruncated {
+		return true
+	}
+	if routeOnly && !submoduleRoute && !hiddenRoute {
+		return false
+	}
 	info, err := entry.Info()
 	if err != nil {
 		e.scanTruncated = true
@@ -732,20 +802,46 @@ func (e *Engine) scanProjectEntry(
 	}
 
 	filePath := filepath.Join(dirPath, entry.Name())
-	route := e.shouldIndexHiddenRoot(filePath)
-	if (e.shouldSkipDirPath(filePath) && !route) || !e.isTracked(rel) {
+	nextRouteOnly := routeOnly
+	if slices.Contains(e.SkipDirs, entry.Name()) {
+		return false
+	}
+	skipDir := e.shouldSkipDirPath(filePath)
+	if e.scanTruncated {
+		return true
+	}
+	if skipDir {
+		if !e.shouldIndexHiddenRoot(filePath) && !submoduleRoute {
+			return false
+		}
+		nextRouteOnly = true
+	}
+	if !e.isTracked(rel) {
 		return false
 	}
 	if e.ScanDepth > 0 && pathDepth(rel) > e.ScanDepth {
 		e.scanDepthTruncated = true
 		return false
 	}
-	nextRouteOnly := routeOnly || route
+	submodule, isSubmodule := e.submoduleForPath(rel)
+	if isSubmodule && submodule.Initialized && e.IncludeSubmodules {
+		e.addIncludedSubmodule(rel)
+		nextRouteOnly = false
+	}
 	e.indexedDirs = append(e.indexedDirs, rel)
 	if !nextRouteOnly {
 		e.projectDirs = append(e.projectDirs, rel)
 	}
-	return e.scanProjectDir(filePath, rel, nextRouteOnly, visited)
+	return e.scanProjectDir(filePath, rel, visited, nextRouteOnly)
+}
+
+func (e *Engine) indexedHiddenRoute(rel string) bool {
+	local := filepath.Clean(e.pathAtAnalysisRoot(rel))
+	if local == "." || local == "" {
+		return false
+	}
+	name, _, _ := strings.Cut(local, string(filepath.Separator))
+	return indexedHiddenRootDirs[name]
 }
 
 func pathDepth(rel string) int {
@@ -816,10 +912,10 @@ func (e *Engine) contains(file string, patterns []string) bool {
 		return e.globContains(file, patterns)
 	}
 
-	files := []string{file}
+	files := e.rootCandidates(file)
 	if filepath.ToSlash(file) == cargoManifestFile {
 		for _, manifest := range e.manifestPaths() {
-			if manifest != file && path.Base(filepath.ToSlash(manifest)) == cargoManifestFile {
+			if !slices.Contains(files, manifest) && path.Base(filepath.ToSlash(manifest)) == cargoManifestFile {
 				files = append(files, manifest)
 			}
 		}
@@ -837,7 +933,7 @@ func (e *Engine) contains(file string, patterns []string) bool {
 func (e *Engine) globContains(pattern string, contentPatterns []string) bool {
 	e.loadProjectFiles()
 	for _, rel := range e.projectFiles {
-		if !matchPathPattern(pattern, filepath.ToSlash(rel)) {
+		if !e.matchesProjectPattern(pattern, rel) {
 			continue
 		}
 		data, err := e.safeReadFile(rel)
@@ -970,37 +1066,39 @@ func (e *Engine) manifestPaths() []string {
 		paths = append(paths, p)
 	}
 
-	for _, mf := range e.KB.ManifestFiles {
-		add(mf)
-	}
-	if cargoRoot, found := e.cargoManifestRoot(); found && cargoRoot != "" {
-		add(path.Join(cargoRoot, cargoManifestFile))
-		add(path.Join(cargoRoot, cargoLockFile))
+	roots := e.analysisRoots()
+	for _, root := range roots {
+		for _, mf := range e.KB.ManifestFiles {
+			add(path.Join(filepath.ToSlash(root), mf))
+		}
 	}
 
 	e.loadProjectFiles()
 	for _, rel := range e.indexedFiles {
 		slashRel := filepath.ToSlash(rel)
-		if matchPathPattern(".github/workflows/*.yml", slashRel) ||
-			matchPathPattern(".github/workflows/*.yaml", slashRel) {
+		if e.matchesProjectPattern(".github/workflows/*.yml", rel) ||
+			e.matchesProjectPattern(".github/workflows/*.yaml", rel) {
 			add(slashRel)
 		}
 	}
 
-	e.addCargoWorkspaceManifests(add)
-	e.addGoWorkspaceManifests(add)
-	e.addPackageWorkspaceManifests(add)
-	e.addPnpmWorkspaceManifests(add)
+	for _, root := range roots {
+		cargoRoot, found := e.cargoManifestRootFrom(root)
+		if found {
+			add(path.Join(cargoRoot, cargoManifestFile))
+			add(path.Join(cargoRoot, cargoLockFile))
+			e.addCargoWorkspaceManifestsFrom(cargoRoot, add)
+		}
+		e.addGoWorkspaceManifestsFrom(root, add)
+		e.addPackageWorkspaceManifestsFrom(root, add)
+		e.addPnpmWorkspaceManifestsFrom(root, add)
+	}
 
 	e.manifestPathsCache = paths
 	return paths
 }
 
-func (e *Engine) addCargoWorkspaceManifests(add func(string)) {
-	cargoRoot, found := e.cargoManifestRoot()
-	if !found {
-		return
-	}
+func (e *Engine) addCargoWorkspaceManifestsFrom(cargoRoot string, add func(string)) {
 	data, err := e.safeReadFile(path.Join(cargoRoot, cargoManifestFile))
 	if err != nil {
 		return
@@ -1031,60 +1129,76 @@ func (e *Engine) addCargoWorkspaceManifests(add func(string)) {
 	}
 }
 
-// cargoManifestRoot returns the root Cargo manifest directory. When the
-// repository root has no Cargo.toml but contains Rust source, it finds the
-// shallowest Cargo.toml visible to the configured scan.
-func (e *Engine) cargoManifestRoot() (string, bool) {
-	if e.cargoLoaded {
-		return e.cargoRoot, e.cargoFound
+// cargoManifestRootFrom returns the root Cargo manifest directory below base.
+// When base has no Cargo.toml but contains Rust source, it finds the shallowest
+// Cargo.toml visible to the configured scan.
+func (e *Engine) cargoManifestRootFrom(base string) (string, bool) {
+	base = filepath.Clean(base)
+	if base == "." {
+		base = ""
 	}
-	e.cargoLoaded = true
-
-	if e.exactFileExists(cargoManifestFile) {
-		e.cargoFound = true
-		return "", true
+	manifest := filepath.Join(base, cargoManifestFile)
+	if e.exactFileExists(manifest) {
+		return filepath.ToSlash(base), true
 	}
 
-	e.loadFileExts()
-	if e.fileExts[".rs"] == 0 {
+	e.loadProjectFiles()
+	hasRust := false
+	for _, rel := range e.projectFiles {
+		if e.analysisRootFor(rel) == base && filepath.Ext(rel) == ".rs" {
+			hasRust = true
+			break
+		}
+	}
+	if !hasRust {
 		return "", false
 	}
 
+	best := ""
 	bestDepth := 0
-	e.loadProjectFiles()
 	for _, rel := range e.projectFiles {
-		if filepath.Base(rel) != cargoManifestFile {
+		if e.analysisRootFor(rel) != base || filepath.Base(rel) != cargoManifestFile {
 			continue
 		}
-		dir := filepath.ToSlash(filepath.Dir(rel))
-		depth := strings.Count(dir, "/") + 1
-		if !e.cargoFound || depth < bestDepth || (depth == bestDepth && dir < e.cargoRoot) {
-			e.cargoRoot = dir
-			e.cargoFound = true
+		dir := filepath.Dir(rel)
+		localDir, err := filepath.Rel(baseOrDot(base), dir)
+		if err != nil {
+			continue
+		}
+		depth := pathDepth(localDir)
+		slashDir := filepath.ToSlash(dir)
+		if best == "" || depth < bestDepth || (depth == bestDepth && slashDir < best) {
+			best = slashDir
 			bestDepth = depth
 			if depth == 1 {
 				break
 			}
 		}
 	}
-
-	return e.cargoRoot, e.cargoFound
+	return best, best != ""
 }
 
-func (e *Engine) addGoWorkspaceManifests(add func(string)) {
-	data, err := e.safeReadFile("go.work")
+func baseOrDot(base string) string {
+	if base == "" {
+		return "."
+	}
+	return base
+}
+
+func (e *Engine) addGoWorkspaceManifestsFrom(base string, add func(string)) {
+	data, err := e.safeReadFile(path.Join(filepath.ToSlash(base), "go.work"))
 	if err != nil {
 		return
 	}
 	for _, member := range parseGoWorkUsePaths(string(data)) {
-		for _, dir := range e.expandWorkspacePattern(member) {
+		for _, dir := range e.expandWorkspacePatternFrom(filepath.ToSlash(base), member) {
 			add(path.Join(dir, "go.mod"))
 		}
 	}
 }
 
-func (e *Engine) addPackageWorkspaceManifests(add func(string)) {
-	data, err := e.safeReadFile("package.json")
+func (e *Engine) addPackageWorkspaceManifestsFrom(base string, add func(string)) {
+	data, err := e.safeReadFile(path.Join(filepath.ToSlash(base), "package.json"))
 	if err != nil {
 		return
 	}
@@ -1096,14 +1210,14 @@ func (e *Engine) addPackageWorkspaceManifests(add func(string)) {
 		return
 	}
 	for _, pattern := range packageWorkspacePatterns(root.Workspaces) {
-		for _, dir := range e.expandWorkspacePattern(pattern) {
+		for _, dir := range e.expandWorkspacePatternFrom(filepath.ToSlash(base), pattern) {
 			add(path.Join(dir, "package.json"))
 		}
 	}
 }
 
-func (e *Engine) addPnpmWorkspaceManifests(add func(string)) {
-	data, err := e.safeReadFile("pnpm-workspace.yaml")
+func (e *Engine) addPnpmWorkspaceManifestsFrom(base string, add func(string)) {
+	data, err := e.safeReadFile(path.Join(filepath.ToSlash(base), "pnpm-workspace.yaml"))
 	if err != nil {
 		return
 	}
@@ -1124,9 +1238,9 @@ func (e *Engine) addPnpmWorkspaceManifests(add func(string)) {
 		}
 		includes = append(includes, pattern)
 	}
-	excluded := e.workspacePatternSet(excludes)
+	excluded := e.workspacePatternSetFrom(filepath.ToSlash(base), excludes)
 	for _, pattern := range includes {
-		for _, dir := range e.expandWorkspacePattern(pattern) {
+		for _, dir := range e.expandWorkspacePatternFrom(filepath.ToSlash(base), pattern) {
 			if excluded[dir] {
 				continue
 			}
@@ -1220,10 +1334,6 @@ func cleanWorkspaceMember(member string) string {
 	return filepath.ToSlash(filepath.Clean(member))
 }
 
-func (e *Engine) workspacePatternSet(patterns []string) map[string]bool {
-	return e.workspacePatternSetFrom("", patterns)
-}
-
 func (e *Engine) workspacePatternSetFrom(base string, patterns []string) map[string]bool {
 	set := make(map[string]bool)
 	for _, pattern := range patterns {
@@ -1232,10 +1342,6 @@ func (e *Engine) workspacePatternSetFrom(base string, patterns []string) map[str
 		}
 	}
 	return set
-}
-
-func (e *Engine) expandWorkspacePattern(pattern string) []string {
-	return e.expandWorkspacePatternFrom("", pattern)
 }
 
 func (e *Engine) expandWorkspacePatternFrom(base, pattern string) []string {
@@ -1588,15 +1694,11 @@ func (e *Engine) detectLayout(languages []brief.Detection) *brief.LayoutInfo {
 	layout := &brief.LayoutInfo{}
 
 	for _, dir := range e.KB.Layouts.Layout.SourceDirs {
-		if e.exists(dir + "/") {
-			layout.SourceDirs = append(layout.SourceDirs, dir)
-		}
+		layout.SourceDirs = append(layout.SourceDirs, e.layoutDirsNamed(dir)...)
 	}
 
 	for _, dir := range e.KB.Layouts.Layout.TestDirs {
-		if e.exists(dir + "/") {
-			layout.TestDirs = append(layout.TestDirs, dir)
-		}
+		layout.TestDirs = append(layout.TestDirs, e.layoutDirsNamed(dir)...)
 	}
 
 	if len(layout.SourceDirs) == 0 {
@@ -1635,13 +1737,30 @@ func (e *Engine) inferFlatLayout(languages []brief.Detection, testDirs []string)
 		skip[d] = true
 	}
 
+	e.loadProjectFiles()
 	var found []string
-	for _, name := range e.dirDirs(".") {
-		if e.shouldSkipDirPath(filepath.Join(e.Root, name)) || skip[name] {
+	for _, rel := range e.projectDirs {
+		local := e.pathAtAnalysisRoot(rel)
+		if local == "." || strings.Contains(local, string(filepath.Separator)) {
 			continue
 		}
-		if e.dirHasExtension(name, exts) {
-			found = append(found, name)
+		name := filepath.Base(local)
+		if skip[name] {
+			continue
+		}
+		if e.projectDirHasExtension(rel, exts) {
+			found = append(found, filepath.ToSlash(rel))
+		}
+	}
+	return found
+}
+
+func (e *Engine) layoutDirsNamed(name string) []string {
+	e.loadProjectFiles()
+	var found []string
+	for _, rel := range e.projectDirs {
+		if filepath.ToSlash(e.pathAtAnalysisRoot(rel)) == name {
+			found = append(found, filepath.ToSlash(rel))
 		}
 	}
 	return found
@@ -1668,13 +1787,13 @@ func (e *Engine) languageExtensions(name string) []string {
 	return exts
 }
 
-// dirHasExtension reports whether dir directly contains a file with one of the
-// given extensions.
-func (e *Engine) dirHasExtension(dir string, exts []string) bool {
-	for _, name := range e.dirFiles(dir) {
-		ext := filepath.Ext(name)
+func (e *Engine) projectDirHasExtension(dir string, exts []string) bool {
+	for _, file := range e.projectFiles {
+		if filepath.Dir(file) != dir {
+			continue
+		}
 		for _, want := range exts {
-			if ext == want {
+			if filepath.Ext(file) == want {
 				return true
 			}
 		}
@@ -1828,11 +1947,10 @@ func (e *Engine) detectSkills() []brief.Skill {
 	e.loadProjectFiles()
 	for _, glob := range []string{"skills/*/SKILL.md", ".claude/skills/*/SKILL.md"} {
 		for _, rel := range e.indexedFiles {
-			rel = filepath.ToSlash(rel)
-			if !matchPathPattern(glob, rel) {
+			if !e.matchesProjectPattern(glob, rel) {
 				continue
 			}
-			skills = append(skills, e.parseSkill(rel))
+			skills = append(skills, e.parseSkill(filepath.ToSlash(rel)))
 		}
 	}
 	return skills
@@ -2190,38 +2308,82 @@ func (e *Engine) detectLineCount(absPath string) *brief.LineCount {
 	if e.scanTruncated || e.scanDepthTruncated {
 		return nil
 	}
+	roots := e.analysisRoots()
+	ctx := context.Background()
+	cancel := func() {}
+	if e.LineCountTimeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, e.LineCountTimeout)
+	}
+	defer cancel()
 
-	// Try scc first
-	if _, err := exec.LookPath("scc"); err == nil {
-		if out, timedOut, err := e.lineCounterOutput("scc", e.sccArgs(absPath)...); err == nil {
-			return parseSCCOutput(out)
+	if _, err := exec.LookPath(lineCounterSCC); err == nil {
+		if count, timedOut, ok := e.countRoots(ctx, lineCounterSCC, absPath, roots); ok {
+			return count
 		} else if timedOut {
 			return nil
 		}
 	}
 
-	// Try tokei
 	if _, err := exec.LookPath("tokei"); err == nil {
-		if out, _, err := e.lineCounterOutput("tokei", "--output", "json", absPath); err == nil {
-			return parseTokeiOutput(out)
+		if count, _, ok := e.countRoots(ctx, "tokei", absPath, roots); ok {
+			return count
 		}
 	}
 
 	return nil
 }
 
-func (e *Engine) lineCounterOutput(name string, args ...string) ([]byte, bool, error) {
-	if e.LineCountTimeout == 0 {
-		out, err := exec.Command(name, args...).Output()
-		return out, false, err
+func (e *Engine) countRoots(
+	ctx context.Context,
+	name, absPath string,
+	roots []string,
+) (*brief.LineCount, bool, bool) {
+	var total *brief.LineCount
+	for _, root := range roots {
+		rootPath := filepath.Join(absPath, root)
+		var args []string
+		switch name {
+		case lineCounterSCC:
+			args = e.sccArgs(rootPath, root)
+		case "tokei":
+			args = e.tokeiArgs(rootPath, root)
+		}
+		out, err := exec.CommandContext(ctx, name, args...).Output()
+		if err != nil {
+			return nil, ctx.Err() != nil, false
+		}
+		var count *brief.LineCount
+		if name == lineCounterSCC {
+			count = parseSCCOutput(out)
+		} else {
+			count = parseTokeiOutput(out)
+		}
+		if count == nil {
+			return nil, false, false
+		}
+		total = mergeLineCounts(total, count)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), e.LineCountTimeout)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, name, args...).Output()
-	return out, ctx.Err() != nil, err
+	return total, false, true
 }
 
-func (e *Engine) sccArgs(absPath string) []string {
+func mergeLineCounts(total, count *brief.LineCount) *brief.LineCount {
+	if total == nil {
+		total = &brief.LineCount{ByLanguage: make(map[string]int), Source: count.Source}
+	}
+	total.TotalFiles += count.TotalFiles
+	total.TotalLines += count.TotalLines
+	for language, lines := range count.ByLanguage {
+		total.ByLanguage[language] += lines
+	}
+	return total
+}
+
+func (e *Engine) sccArgs(absPath, root string) []string {
+	dirs := e.lineCountExcludedDirs(absPath, root)
+	return []string{"--format", "json", "--exclude-dir", strings.Join(dirs, ","), absPath}
+}
+
+func (e *Engine) lineCountExcludedDirs(absPath, root string) []string {
 	excluded := make(map[string]bool)
 	for dir := range defaultSkipDirs {
 		excluded[dir] = true
@@ -2234,8 +2396,9 @@ func (e *Engine) sccArgs(absPath string) []string {
 	for _, dir := range []string{".git", ".hg", ".svn"} {
 		excluded[dir] = true
 	}
-	depsPath := filepath.Join(e.Root, "deps")
-	if info, err := os.Stat(depsPath); err == nil && info.IsDir() && e.shouldSkipDirPath(depsPath) {
+	depsPath := filepath.Join(absPath, "deps")
+	logicalDepsPath := filepath.Join(e.Root, root, "deps")
+	if info, err := os.Stat(depsPath); err == nil && info.IsDir() && e.shouldSkipDirPath(logicalDepsPath) {
 		excluded["deps"] = true
 	}
 
@@ -2244,7 +2407,27 @@ func (e *Engine) sccArgs(absPath string) []string {
 		dirs = append(dirs, dir)
 	}
 	sort.Strings(dirs)
-	return []string{"--format", "json", "--exclude-dir", strings.Join(dirs, ","), absPath}
+	return dirs
+}
+
+func (e *Engine) tokeiArgs(absPath, root string) []string {
+	args := []string{"--output", "json"}
+	excluded := make(map[string]bool)
+	for _, dir := range e.lineCountExcludedDirs(absPath, root) {
+		excluded[filepath.ToSlash(dir)+"/"] = true
+	}
+	for _, submodule := range e.directSubmodulePaths(root) {
+		excluded[submodule+"/"] = true
+	}
+	patterns := make([]string, 0, len(excluded))
+	for pattern := range excluded {
+		patterns = append(patterns, pattern)
+	}
+	sort.Strings(patterns)
+	for _, pattern := range patterns {
+		args = append(args, "--exclude", pattern)
+	}
+	return append(args, absPath)
 }
 
 // parseSCCOutput parses scc --format json output.
@@ -2261,7 +2444,7 @@ func parseSCCOutput(data []byte) *brief.LineCount {
 
 	lc := &brief.LineCount{
 		ByLanguage: make(map[string]int),
-		Source:     "scc",
+		Source:     lineCounterSCC,
 	}
 	for _, r := range results {
 		lc.TotalFiles += r.Count

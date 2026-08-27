@@ -82,6 +82,7 @@ func cmdScan(args []string) {
 	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
 	skip := fs.String("skip", "", "Additional directories to skip, comma-separated")
 	tracked := fs.Bool("tracked", false, "Only consider files tracked by git")
+	includeSubmodules := fs.Bool("include-submodules", false, "Include initialized Git submodule contents")
 	version := fs.Bool("version", false, "Print version and exit")
 	_ = fs.Parse(args)
 
@@ -119,7 +120,7 @@ func cmdScan(args []string) {
 
 	code := runScan(
 		src.Dir, *scanDepth, *scanLimit, *lineCountTimeout, *skip, *category,
-		*tracked, *jsonFlag, *humanFlag, *markdownFlag, *verbose,
+		*tracked, *includeSubmodules, *jsonFlag, *humanFlag, *markdownFlag, *verbose,
 	)
 	src.Cleanup()
 	os.Exit(code)
@@ -130,7 +131,7 @@ func runScan(
 	scanDepth, scanLimit int,
 	lineCountTimeout time.Duration,
 	skip, category string,
-	tracked, jsonFlag, humanFlag, markdownFlag, verbose bool,
+	tracked, includeSubmodules, jsonFlag, humanFlag, markdownFlag, verbose bool,
 ) int {
 	knowledgeBase, err := kb.Load(brief.KnowledgeFS)
 	if err != nil {
@@ -143,6 +144,7 @@ func runScan(
 	engine.ScanLimit = scanLimit
 	engine.LineCountTimeout = lineCountTimeout
 	engine.TrackedOnly = tracked
+	engine.IncludeSubmodules = includeSubmodules
 	if skip != "" {
 		engine.SkipDirs = strings.Split(skip, ",")
 	}

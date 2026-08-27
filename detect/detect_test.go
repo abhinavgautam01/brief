@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +13,21 @@ import (
 	"github.com/git-pkgs/brief"
 	"github.com/git-pkgs/brief/kb"
 )
+
+const lineCounterHelperEnv = "BRIEF_TEST_LINE_COUNTER"
+
+func TestMain(m *testing.M) {
+	if os.Getenv(lineCounterHelperEnv) != "" {
+		target := filepath.ToSlash(os.Args[len(os.Args)-1])
+		if strings.HasSuffix(target, "/vendor/native") {
+			_, _ = os.Stdout.WriteString("[{\"Name\":\"C\",\"Lines\":1,\"Code\":1,\"Count\":1}]\n")
+		} else {
+			_, _ = os.Stdout.WriteString("[]\n")
+		}
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
 
 func loadKB(t *testing.T) *kb.KnowledgeBase {
 	t.Helper()
@@ -821,10 +837,17 @@ func TestCargoManifestRootPrefersShallowest(t *testing.T) {
 	writeFile(t, dir, "a/deep/src/lib.rs", "pub fn deep() {}\n")
 	writeFile(t, dir, "z/Cargo.toml", "[package]\nname = \"shallow\"\nversion = \"0.1.0\"\n")
 
-	root, found := New(loadKB(t), dir).cargoManifestRoot()
-	if !found || root != "z" {
-		t.Fatalf("cargoManifestRoot = %q, %v, want z, true", root, found)
+	report := runOn(t, dir)
+	for _, manager := range report.PackageManagers {
+		if manager.Name != "Cargo" {
+			continue
+		}
+		if !slices.Contains(manager.ConfigFiles, "z/Cargo.toml") {
+			t.Fatalf("Cargo config files = %v, want z/Cargo.toml", manager.ConfigFiles)
+		}
+		return
 	}
+	t.Fatalf("package managers = %v, want Cargo", packageManagerNames(report))
 }
 
 func TestCargoLockfileDependencies(t *testing.T) {
@@ -1633,6 +1656,312 @@ func TestRecursiveGlobHonorsScanLimit(t *testing.T) {
 	}
 }
 
+func TestIncludeSubmodules(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	deep := initGitProject(t, map[string]string{
+		"Cargo.toml": "[package]\nname = \"deep\"\nversion = \"0.1.0\"\n",
+		"src/lib.rs": "pub fn deep() {}\n",
+	})
+	native := initGitProject(t, map[string]string{
+		"CMakeLists.txt":       "cmake_minimum_required(VERSION 3.20)\nproject(native C)\n",
+		"deps/local/source.jl": "module LocalDependency\nend\n",
+		"go.mod":               "module example.com/native\n\ngo 1.22\n\nrequire github.com/google/uuid v1.6.0\n",
+		"native.go":            "package native\n",
+		"src/native.c":         "int native(void) { return 0; }\n",
+	})
+	addGitSubmodule(t, native, deep, "third_party/deep")
+
+	parent := initGitProject(t, map[string]string{
+		"main.py":        "print('example')\n",
+		"pyproject.toml": "[project]\nname = \"example\"\nversion = \"1.0.0\"\n",
+	})
+	addGitSubmodule(t, parent, native, "vendor/native")
+	gitFixtureCommand(t, parent, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--recursive")
+	writeProjectFile(t, parent, "vendor/unrelated/noise.f90", "program noise\nend program noise\n")
+	gitFixtureCommand(t, parent, "add", "vendor/unrelated/noise.f90")
+	gitFixtureCommand(t, parent, "commit", "-q", "-m", "add unrelated vendor file")
+	installSubmoduleSCC(t)
+
+	withoutEngine := New(loadKB(t), parent)
+	withoutEngine.LineCountTimeout = 0
+	without, err := withoutEngine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	assertToolDetected(t, without, "dependency_bot", "Git Submodules")
+	for _, name := range []string{"C", "Go", "Julia", "Rust", "Fortran"} {
+		if slices.Contains(languageNames(without), name) {
+			t.Errorf("default scan included %s from a submodule or vendor directory", name)
+		}
+	}
+	if without.Lines == nil || without.Lines.Source != lineCounterSCC || without.Lines.ByLanguage["C"] != 0 {
+		t.Errorf("default line counts should exclude submodule C source, got %+v", without.Lines)
+	}
+
+	tooShallow := New(loadKB(t), parent)
+	tooShallow.IncludeSubmodules = true
+	tooShallow.ScanDepth = 1
+	tooShallow.LineCountTimeout = 0
+	shallowReport, err := tooShallow.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	for _, name := range []string{"C", "Go", "Julia", "Rust"} {
+		if slices.Contains(languageNames(shallowReport), name) {
+			t.Errorf("ScanDepth=1 included %s below vendor/native", name)
+		}
+	}
+
+	engine := New(loadKB(t), parent)
+	engine.IncludeSubmodules = true
+	engine.ScanDepth = 5
+	engine.LineCountTimeout = 0
+	with, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	for _, name := range []string{"C", "Go", "Julia", "Rust"} {
+		if !slices.Contains(languageNames(with), name) {
+			t.Errorf("included submodule languages = %v, want %s", languageNames(with), name)
+		}
+	}
+	if slices.Contains(languageNames(with), "Fortran") {
+		t.Errorf("submodule scan included unrelated vendored source: %v", languageNames(with))
+	}
+	assertToolDetected(t, with, "build", "CMake")
+	if !slices.Contains(packageManagerNames(with), "Go Modules") {
+		t.Errorf("package managers = %v, want Go Modules", packageManagerNames(with))
+	}
+	if !slices.ContainsFunc(with.Manifests, func(manifest brief.ManifestInfo) bool {
+		return manifest.Path == "vendor/native/go.mod" && manifest.Ecosystem == "golang"
+	}) {
+		t.Errorf("manifests should include vendor/native/go.mod, got %+v", with.Manifests)
+	}
+	if !slices.ContainsFunc(with.Manifests, func(manifest brief.ManifestInfo) bool {
+		return manifest.Path == "vendor/native/third_party/deep/Cargo.toml" && manifest.Ecosystem == "cargo"
+	}) {
+		t.Errorf("manifests should include the recursive submodule Cargo.toml, got %+v", with.Manifests)
+	}
+	if !slices.ContainsFunc(with.Dependencies, func(dependency brief.DepInfo) bool {
+		return dependency.Name == "github.com/google/uuid"
+	}) {
+		t.Errorf("dependencies should include the submodule Go dependency, got %+v", with.Dependencies)
+	}
+	for _, want := range []string{"vendor/native/src", "vendor/native/third_party/deep/src"} {
+		if with.Layout == nil || !slices.Contains(with.Layout.SourceDirs, want) {
+			t.Errorf("source directories = %+v, want %q", with.Layout, want)
+		}
+	}
+	if with.Lines == nil || with.Lines.Source != lineCounterSCC || with.Lines.ByLanguage["C"] == 0 {
+		t.Errorf("line counts should include submodule C source, got %+v", with.Lines)
+	}
+}
+
+func TestIncludeSubmodulesHonorsExplicitSkip(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	native := initGitProject(t, map[string]string{"native.c": "int native(void) { return 0; }\n"})
+	parent := initGitProject(t, map[string]string{"main.py": "print('example')\n"})
+	addGitSubmodule(t, parent, native, "vendor/native")
+
+	engine := New(loadKB(t), parent)
+	engine.IncludeSubmodules = true
+	engine.SkipDirs = []string{"vendor"}
+	report, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if slices.Contains(languageNames(report), "C") {
+		t.Errorf("explicit vendor skip included C: %v", languageNames(report))
+	}
+}
+
+func installSubmoduleSCC(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	helperName := lineCounterSCC
+	if runtime.GOOS == "windows" {
+		helperName += ".exe"
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	helperPath := filepath.Join(dir, helperName)
+	if runtime.GOOS == "windows" {
+		data, err := os.ReadFile(executable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(helperPath, data, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	} else if err := os.Link(executable, helperPath); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(lineCounterHelperEnv, "1")
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestIncludeSubmodulesSkipsUninitializedCheckout(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	native := initGitProject(t, map[string]string{"native.c": "int native(void) { return 0; }\n"})
+	parent := initGitProject(t, map[string]string{"main.py": "print('example')\n"})
+	addGitSubmodule(t, parent, native, "modules/native")
+	checkout := filepath.Join(t.TempDir(), "checkout")
+	gitFixtureCommand(t, ".", "clone", "-q", parent, checkout)
+
+	engine := New(loadKB(t), checkout)
+	engine.IncludeSubmodules = true
+	report, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	assertToolDetected(t, report, "dependency_bot", "Git Submodules")
+	if slices.Contains(languageNames(report), "C") {
+		t.Errorf("uninitialized submodule contributed a language: %v", languageNames(report))
+	}
+}
+
+func TestIncludeSubmodulesHonorsScanLimitWhileReadingGitmodules(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	dir := t.TempDir()
+	writeProjectFile(t, dir, ".gitmodules", `[submodule "one"]
+	path = modules/one
+	url = ../one
+[submodule "two"]
+	path = modules/two
+	url = ../two
+[submodule "three"]
+	path = modules/three
+	url = ../three
+`)
+	engine := New(loadKB(t), dir)
+	engine.IncludeSubmodules = true
+	engine.ScanLimit = 2
+	report, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !report.Stats.ScanTruncated {
+		t.Fatal("expected .gitmodules entries to respect the scan limit")
+	}
+}
+
+func TestDefaultScanIgnoresSubmoduleEntryBudget(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFile(t, dir, ".gitmodules", `[submodule "one"]
+	path = modules/one
+	url = ../one
+[submodule "two"]
+	path = modules/two
+	url = ../two
+[submodule "three"]
+	path = modules/three
+	url = ../three
+[submodule "four"]
+	path = modules/four
+	url = ../four
+[submodule "five"]
+	path = modules/five
+	url = ../five
+`)
+	writeProjectFile(t, dir, "README.md", "example\n")
+	writeProjectFile(t, dir, "src/main.go", "package example\n")
+
+	engine := New(loadKB(t), dir)
+	engine.ScanLimit = 4
+	report, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if report.Stats.ScanTruncated {
+		t.Fatal("default scan was truncated by .gitmodules entries")
+	}
+	if !slices.Contains(languageNames(report), "Go") {
+		t.Errorf("languages = %v, want Go", languageNames(report))
+	}
+}
+
+func TestTrackedSubmodulesHonorScanDepth(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	native := initGitProject(t, map[string]string{"native.c": "int native(void) { return 0; }\n"})
+	parent := initGitProject(t, map[string]string{"main.py": "print('example')\n"})
+	addGitSubmodule(t, parent, native, "one/two/native")
+
+	engine := New(loadKB(t), parent)
+	engine.IncludeSubmodules = true
+	engine.TrackedOnly = true
+	engine.ScanDepth = 1
+	if _, err := engine.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	submoduleFile := filepath.Join("one", "two", "native", "native.c")
+	if engine.tracked[submoduleFile] {
+		t.Errorf("tracked files include out-of-depth submodule file %q", submoduleFile)
+	}
+}
+
+func TestIncludeSubmodulesRejectsUnavailableWorktrees(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	tests := []struct {
+		name      string
+		configure func(*testing.T, string)
+	}{
+		{
+			name: "stale gitdir",
+			configure: func(t *testing.T, root string) {
+				writeProjectFile(t, root, "modules/native/.git", "gitdir: ../missing\n")
+			},
+		},
+		{
+			name: "standalone repository",
+			configure: func(t *testing.T, root string) {
+				gitFixtureCommand(t, filepath.Join(root, "modules/native"), "init", "-q")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProjectFile(t, dir, ".gitmodules", `[submodule "native"]
+	path = modules/native
+	url = ../native
+`)
+			writeProjectFile(t, dir, "modules/native/native.c", "int native(void) { return 0; }\n")
+			tt.configure(t, dir)
+
+			engine := New(loadKB(t), dir)
+			engine.IncludeSubmodules = true
+			report, err := engine.Run()
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if slices.Contains(languageNames(report), "C") {
+				t.Errorf("unavailable submodule contributed a language: %v", languageNames(report))
+			}
+		})
+	}
+}
+
 func TestTrackedOnlyIgnoresDepthOfUntrackedDirectories(t *testing.T) {
 	dir := t.TempDir()
 	writeProjectFile(t, dir, "one/tracked.go", "package example\n")
@@ -1665,6 +1994,35 @@ func writeProjectFile(t *testing.T, dir, path, content string) {
 	}
 	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func initGitProject(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	gitFixtureCommand(t, dir, "init", "-q")
+	gitFixtureCommand(t, dir, "config", "user.name", "Test")
+	gitFixtureCommand(t, dir, "config", "user.email", "test@example.com")
+	for name, content := range files {
+		writeProjectFile(t, dir, name, content)
+	}
+	gitFixtureCommand(t, dir, "add", ".")
+	gitFixtureCommand(t, dir, "commit", "-q", "-m", "initial")
+	return dir
+}
+
+func addGitSubmodule(t *testing.T, parent, child, path string) {
+	t.Helper()
+	gitFixtureCommand(t, parent, "-c", "protocol.file.allow=always", "submodule", "add", "-q", child, path)
+	gitFixtureCommand(t, parent, "commit", "-q", "-m", "add submodule")
+}
+
+func gitFixtureCommand(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 }
 
@@ -2021,7 +2379,7 @@ func TestSCCArgsIncludeResolvedSkipDirs(t *testing.T) {
 	dir := t.TempDir()
 	engine := New(loadKB(t), dir)
 	engine.SkipDirs = []string{"generated"}
-	args := engine.sccArgs(dir)
+	args := engine.sccArgs(dir, "")
 
 	excludeIndex := slices.Index(args, "--exclude-dir")
 	if excludeIndex == -1 || excludeIndex+1 >= len(args) {
@@ -2042,11 +2400,73 @@ func TestSCCArgsIncludeResolvedSkipDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine = New(loadKB(t), dir)
-	args = engine.sccArgs(dir)
+	args = engine.sccArgs(dir, "")
 	excludeIndex = slices.Index(args, "--exclude-dir")
 	excluded = strings.Split(args[excludeIndex+1], ",")
 	if !slices.Contains(excluded, "deps") {
 		t.Errorf("scc exclusions should contain Mix deps, got %v", excluded)
+	}
+}
+
+func TestSCCArgsResolveDepsFromRelativeRoot(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.MkdirTemp(cwd, "brief-relative-root-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("RemoveAll: %v", err)
+		}
+	})
+	gitFixtureCommand(t, dir, "init", "-q")
+	writeProjectFile(t, dir, "deps/example/lib.ex", "defmodule Example do\nend\n")
+	relativeRoot, err := filepath.Rel(cwd, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	absRoot, err := filepath.Abs(relativeRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	engine := New(loadKB(t), relativeRoot)
+	args := engine.sccArgs(absRoot, "")
+	excludeIndex := slices.Index(args, "--exclude-dir")
+	if excludeIndex == -1 || excludeIndex+1 >= len(args) {
+		t.Fatalf("scc args missing --exclude-dir: %v", args)
+	}
+	excluded := strings.Split(args[excludeIndex+1], ",")
+	if !slices.Contains(excluded, "deps") {
+		t.Errorf("scc exclusions should contain deps for a relative root, got %v", excluded)
+	}
+}
+
+func TestTokeiArgsIncludeResolvedSkipDirsAndSubmodules(t *testing.T) {
+	dir := t.TempDir()
+	engine := New(loadKB(t), dir)
+	engine.SkipDirs = []string{"generated"}
+	engine.submodulesLoaded = true
+	engine.submodules = []submoduleInfo{{Path: "modules/native"}}
+	args := engine.tokeiArgs(dir, "")
+
+	var excluded []string
+	for i, arg := range args {
+		if arg == "--exclude" && i+1 < len(args) {
+			excluded = append(excluded, args[i+1])
+		}
+	}
+	for _, want := range []string{"generated/", "modules/native/", "vendor/"} {
+		if !slices.Contains(excluded, want) {
+			t.Errorf("tokei exclusions should contain %q, got %v", want, excluded)
+		}
 	}
 }
 

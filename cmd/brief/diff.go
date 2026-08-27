@@ -25,6 +25,7 @@ func cmdDiff(args []string) {
 	scanDepth := fs.Int("scan-depth", detect.DefaultScanDepth, "Max directory depth for recursive detection (0 = unlimited)")
 	scanLimit := fs.Int("scan-limit", detect.DefaultScanLimit, "Max filesystem entries to scan (0 = unlimited)")
 	lineCountTimeout := fs.Duration("line-count-timeout", detect.DefaultLineCountTimeout, "Max time for line counting (0 = unlimited)")
+	includeSubmodules := fs.Bool("include-submodules", false, "Include initialized Git submodule contents")
 	_ = fs.Parse(args)
 
 	// Determine the project root (git toplevel).
@@ -90,6 +91,7 @@ func cmdDiff(args []string) {
 	engine.ScanDepth = *scanDepth
 	engine.ScanLimit = *scanLimit
 	engine.LineCountTimeout = *lineCountTimeout
+	engine.IncludeSubmodules = *includeSubmodules
 	r, err := engine.Run()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -101,7 +103,8 @@ func cmdDiff(args []string) {
 	r.DiffCommits = commits
 	r.ChangedFiles = changedFiles
 
-	r = detect.FilterByChangedFiles(r, knowledgeBase, changedFiles)
+	filterFiles := engine.ExpandSubmoduleChanges(changedFiles)
+	r = detect.FilterByChangedFiles(r, knowledgeBase, filterFiles)
 
 	if *category != "" {
 		r = filterCategory(r, *category)
