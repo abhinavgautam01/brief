@@ -84,8 +84,10 @@ type Engine struct {
 	cargoRoot           string // relative directory containing the primary Cargo.toml
 	cargoFound          bool
 	cargoLoaded         bool
-	projectFiles        []string
+	projectFiles        []string // broad detection candidates
 	projectDirs         []string
+	indexedFiles        []string // includes routed hidden roots
+	indexedDirs         []string
 	projectFilesLoaded  bool
 	scanTruncated       bool
 	scanDepthTruncated  bool
@@ -145,6 +147,16 @@ var defaultSkipDirs = map[string]bool{
 	"coverage":     true,
 }
 
+var indexedHiddenRootDirs = map[string]bool{
+	".claude":  true,
+	".cursor":  true,
+	".forgejo": true,
+	".gitea":   true,
+	".github":  true,
+	".gitlab":  true,
+	".junie":   true,
+}
+
 // loadTracked populates the set of git-tracked files under Root by running
 // git ls-files once. Paths are stored relative to Root using the OS separator.
 func (e *Engine) loadTracked(abs string) error {
@@ -184,8 +196,7 @@ func (e *Engine) isTracked(rel string) bool {
 
 func (e *Engine) shouldSkipDirPath(dirPath string) bool {
 	name := filepath.Base(dirPath)
-	rootGitHubDir := name == ".github" && filepath.Clean(filepath.Dir(dirPath)) == filepath.Clean(e.Root)
-	if strings.HasPrefix(name, ".") && !rootGitHubDir {
+	if strings.HasPrefix(name, ".") {
 		return true
 	}
 	if defaultSkipDirs[name] {
@@ -203,6 +214,19 @@ func (e *Engine) shouldSkipDirPath(dirPath string) bool {
 		return !e.depsDirHasTrackedFiles(dirPath)
 	}
 	return false
+}
+
+func (e *Engine) shouldIndexHiddenRoot(dirPath string) bool {
+	name := filepath.Base(dirPath)
+	if !indexedHiddenRootDirs[name] || filepath.Clean(filepath.Dir(dirPath)) != filepath.Clean(e.Root) {
+		return false
+	}
+	for _, dir := range e.SkipDirs {
+		if name == dir {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *Engine) exactFileAt(filePath string) bool {
@@ -647,13 +671,15 @@ func (e *Engine) loadProjectFiles() {
 	}
 	e.projectFilesLoaded = true
 	visited := 0
-	e.scanProjectDir(e.Root, "", &visited)
+	e.scanProjectDir(e.Root, "", false, &visited)
 	e.scanEntries = visited
+	sort.Strings(e.indexedDirs)
+	sort.Strings(e.indexedFiles)
 	sort.Strings(e.projectDirs)
 	sort.Strings(e.projectFiles)
 }
 
-func (e *Engine) scanProjectDir(dirPath, relDir string, visited *int) bool {
+func (e *Engine) scanProjectDir(dirPath, relDir string, routeOnly bool, visited *int) bool {
 	dir, err := os.Open(dirPath)
 	if err != nil {
 		e.scanTruncated = true
@@ -668,7 +694,7 @@ func (e *Engine) scanProjectDir(dirPath, relDir string, visited *int) bool {
 			return false
 		}
 		for _, entry := range entries {
-			if e.scanProjectEntry(dirPath, relDir, entry, visited) {
+			if e.scanProjectEntry(dirPath, relDir, entry, routeOnly, visited) {
 				return true
 			}
 		}
@@ -678,7 +704,12 @@ func (e *Engine) scanProjectDir(dirPath, relDir string, visited *int) bool {
 	}
 }
 
-func (e *Engine) scanProjectEntry(dirPath, relDir string, entry os.DirEntry, visited *int) bool {
+func (e *Engine) scanProjectEntry(
+	dirPath, relDir string,
+	entry os.DirEntry,
+	routeOnly bool,
+	visited *int,
+) bool {
 	if e.ScanLimit > 0 && *visited >= e.ScanLimit {
 		e.scanTruncated = true
 		return true
@@ -692,21 +723,29 @@ func (e *Engine) scanProjectEntry(dirPath, relDir string, entry os.DirEntry, vis
 	}
 	if !info.IsDir() {
 		if info.Mode().IsRegular() && e.isTracked(rel) {
-			e.projectFiles = append(e.projectFiles, rel)
+			e.indexedFiles = append(e.indexedFiles, rel)
+			if !routeOnly {
+				e.projectFiles = append(e.projectFiles, rel)
+			}
 		}
 		return false
 	}
 
 	filePath := filepath.Join(dirPath, entry.Name())
-	if e.shouldSkipDirPath(filePath) || !e.isTracked(rel) {
+	route := e.shouldIndexHiddenRoot(filePath)
+	if (e.shouldSkipDirPath(filePath) && !route) || !e.isTracked(rel) {
 		return false
 	}
 	if e.ScanDepth > 0 && pathDepth(rel) > e.ScanDepth {
 		e.scanDepthTruncated = true
 		return false
 	}
-	e.projectDirs = append(e.projectDirs, rel)
-	return e.scanProjectDir(filePath, rel, visited)
+	nextRouteOnly := routeOnly || route
+	e.indexedDirs = append(e.indexedDirs, rel)
+	if !nextRouteOnly {
+		e.projectDirs = append(e.projectDirs, rel)
+	}
+	return e.scanProjectDir(filePath, rel, nextRouteOnly, visited)
 }
 
 func pathDepth(rel string) int {
@@ -940,7 +979,7 @@ func (e *Engine) manifestPaths() []string {
 	}
 
 	e.loadProjectFiles()
-	for _, rel := range e.projectFiles {
+	for _, rel := range e.indexedFiles {
 		slashRel := filepath.ToSlash(rel)
 		if matchPathPattern(".github/workflows/*.yml", slashRel) ||
 			matchPathPattern(".github/workflows/*.yaml", slashRel) {
@@ -1596,17 +1635,8 @@ func (e *Engine) inferFlatLayout(languages []brief.Detection, testDirs []string)
 		skip[d] = true
 	}
 
-	entries, err := os.ReadDir(e.Root)
-	if err != nil {
-		return nil
-	}
-
 	var found []string
-	for _, ent := range entries {
-		if !ent.IsDir() {
-			continue
-		}
-		name := ent.Name()
+	for _, name := range e.dirDirs(".") {
 		if e.shouldSkipDirPath(filepath.Join(e.Root, name)) || skip[name] {
 			continue
 		}
@@ -1703,28 +1733,27 @@ var (
 func (e *Engine) detectTemplates() *brief.TemplateInfo {
 	t := &brief.TemplateInfo{}
 	for _, base := range templateBaseDirs {
-		entries, err := os.ReadDir(filepath.Join(e.Root, filepath.FromSlash(base)))
-		if err != nil {
-			continue
-		}
-		for _, ent := range entries {
-			name := ent.Name()
+		for _, name := range e.dirDirs(base) {
 			lower := strings.ToLower(name)
 			rel := name
 			if base != "." {
 				rel = path.Join(base, name)
 			}
-			if ent.IsDir() {
-				switch lower {
-				case "issue_template", "issue_templates":
-					e.collectTemplates(rel, &t.Issue, &t.Config)
-				case "pull_request_template", "merge_request_templates":
-					e.collectTemplates(rel, &t.PullRequest, nil)
-				}
+			switch lower {
+			case "issue_template", "issue_templates":
+				e.collectTemplates(rel, &t.Issue, &t.Config)
+			case "pull_request_template", "merge_request_templates":
+				e.collectTemplates(rel, &t.PullRequest, nil)
+			}
+		}
+		for _, name := range e.dirFiles(base) {
+			lower := strings.ToLower(name)
+			if !templateExts[path.Ext(lower)] {
 				continue
 			}
-			if !templateExts[path.Ext(lower)] || !e.isTracked(rel) {
-				continue
+			rel := name
+			if base != "." {
+				rel = path.Join(base, name)
 			}
 			switch strings.TrimSuffix(lower, path.Ext(lower)) {
 			case "issue_template":
@@ -1745,23 +1774,12 @@ func (e *Engine) detectTemplates() *brief.TemplateInfo {
 // collectTemplates lists template files in dir, separating the issue chooser
 // config.yml from actual templates.
 func (e *Engine) collectTemplates(dir string, into *[]string, config *string) {
-	entries, err := os.ReadDir(filepath.Join(e.Root, filepath.FromSlash(dir)))
-	if err != nil {
-		return
-	}
-	for _, ent := range entries {
-		if ent.IsDir() {
-			continue
-		}
-		name := ent.Name()
+	for _, name := range e.dirFiles(dir) {
 		lower := strings.ToLower(name)
 		if !templateExts[path.Ext(lower)] {
 			continue
 		}
 		rel := path.Join(dir, name)
-		if !e.isTracked(rel) {
-			continue
-		}
 		if config != nil && (lower == "config.yml" || lower == "config.yaml") {
 			if *config == "" {
 				*config = rel
@@ -1807,18 +1825,13 @@ type skillFrontmatter struct {
 // detectSkills looks for agent skill definitions the project provides.
 func (e *Engine) detectSkills() []brief.Skill {
 	var skills []brief.Skill
+	e.loadProjectFiles()
 	for _, glob := range []string{"skills/*/SKILL.md", ".claude/skills/*/SKILL.md"} {
-		matches, err := filepath.Glob(filepath.Join(e.Root, filepath.FromSlash(glob)))
-		if err != nil {
-			continue
-		}
-		sort.Strings(matches)
-		for _, abs := range matches {
-			rel, err := filepath.Rel(e.Root, abs)
-			if err != nil {
+		for _, rel := range e.indexedFiles {
+			rel = filepath.ToSlash(rel)
+			if !matchPathPattern(glob, rel) {
 				continue
 			}
-			rel = filepath.ToSlash(rel)
 			skills = append(skills, e.parseSkill(rel))
 		}
 	}
@@ -1865,16 +1878,26 @@ func (e *Engine) dirFiles(dir string) []string {
 	if cached, ok := e.dirCache[dir]; ok {
 		return cached
 	}
+	e.loadProjectFiles()
+	names := directProjectNames(e.indexedFiles, dir)
+	e.dirCache[dir] = names
+	return names
+}
+
+func (e *Engine) dirDirs(dir string) []string {
+	e.loadProjectFiles()
+	return directProjectNames(e.indexedDirs, dir)
+}
+
+func directProjectNames(entries []string, dir string) []string {
+	dir = path.Clean(filepath.ToSlash(dir))
 	var names []string
-	entries, err := os.ReadDir(filepath.Join(e.Root, filepath.FromSlash(dir)))
-	if err == nil {
-		for _, ent := range entries {
-			if !ent.IsDir() {
-				names = append(names, ent.Name())
-			}
+	for _, entry := range entries {
+		entry = filepath.ToSlash(entry)
+		if path.Dir(entry) == dir {
+			names = append(names, path.Base(entry))
 		}
 	}
-	e.dirCache[dir] = names
 	return names
 }
 
@@ -1916,13 +1939,13 @@ func (e *Engine) detectPlatforms() *brief.PlatformInfo {
 func (e *Engine) parseCIMatrices(platforms *brief.PlatformInfo) {
 	ci := e.KB.CIConfig.CI
 
+	e.loadProjectFiles()
 	for _, fp := range ci.Files {
-		matches, err := filepath.Glob(filepath.Join(e.Root, fp.Pattern))
-		if err != nil {
-			continue
-		}
-		for _, path := range matches {
-			e.parseCIWorkflow(path, ci.MatrixKeys, platforms)
+		for _, rel := range e.indexedFiles {
+			rel = filepath.ToSlash(rel)
+			if matchPathPattern(fp.Pattern, rel) {
+				e.parseCIWorkflow(filepath.Join(e.Root, filepath.FromSlash(rel)), ci.MatrixKeys, platforms)
+			}
 		}
 	}
 }

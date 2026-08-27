@@ -166,6 +166,8 @@ func TestValidateRejectsUnsafePathPatterns(t *testing.T) {
 		{name: "invalid glob", pattern: "nested/[file.toml"},
 		{name: "backslash", pattern: `nested\file.toml`},
 		{name: "root", pattern: "/"},
+		{name: "relative root", pattern: "./"},
+		{name: "normalized root", pattern: "nested/../"},
 	}
 
 	for _, tt := range tests {

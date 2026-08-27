@@ -530,7 +530,7 @@ func validatePathPattern(pattern string) error {
 		return fmt.Errorf("must not be empty")
 	}
 	cleaned := path.Clean(trimmed)
-	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return fmt.Errorf("must stay within the project root")
 	}
 	doublestar := 0

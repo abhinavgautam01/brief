@@ -311,6 +311,35 @@ func TestResourceGroups(t *testing.T) {
 	}
 }
 
+func TestResourceDetectionHonorsScanLimit(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "README.md", "readme")
+	writeFile(t, dir, "LICENSE", "license")
+
+	engine := New(loadKB(t), dir)
+	engine.ScanLimit = 1
+	r, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !r.Stats.ScanTruncated {
+		t.Fatal("expected scan truncation")
+	}
+	if r.Resources == nil {
+		t.Fatal("expected one indexed resource")
+	}
+
+	indexed := make(map[string]bool, len(engine.indexedFiles))
+	for _, file := range engine.indexedFiles {
+		indexed[filepath.ToSlash(file)] = true
+	}
+	for _, resource := range []string{r.Resources.Readme, r.Resources.License} {
+		if resource != "" && !indexed[resource] {
+			t.Errorf("resource %q was detected outside the bounded project index", resource)
+		}
+	}
+}
+
 func TestResourceCaseInsensitive(t *testing.T) {
 	dir := t.TempDir()
 	for _, p := range []string{"ReadMe.rst", "Security.MD", ".github/Code_Of_Conduct.md"} {
@@ -529,6 +558,7 @@ name: excel-tools
 description: Generate spreadsheets
 ---
 `)
+	writeFile(t, dir, ".claude/skills/excel/helper.py", "print('helper')\n")
 	writeFile(t, dir, "skills/empty/SKILL.md", "no frontmatter\n")
 
 	engine := New(loadKB(t), dir)
@@ -538,6 +568,9 @@ description: Generate spreadsheets
 	}
 	if len(r.Skills) != 3 {
 		t.Fatalf("expected 3 skills, got %d: %+v", len(r.Skills), r.Skills)
+	}
+	if slices.Contains(languageNames(r), "Python") {
+		t.Errorf("hidden skill support file affected language detection: %v", languageNames(r))
 	}
 
 	byPath := map[string]brief.Skill{}
@@ -588,6 +621,21 @@ func TestDetectSkillsNone(t *testing.T) {
 	}
 	if r.Skills != nil {
 		t.Errorf("expected nil skills, got %+v", r.Skills)
+	}
+}
+
+func TestDetectSkillsHonorsHiddenDirectorySkip(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".claude/skills/example/SKILL.md", "skill\n")
+
+	engine := New(loadKB(t), dir)
+	engine.SkipDirs = []string{".claude"}
+	r, err := engine.Run()
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if r.Skills != nil {
+		t.Errorf("expected skipped skills to be omitted, got %+v", r.Skills)
 	}
 }
 
