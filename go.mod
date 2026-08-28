@@ -6,7 +6,7 @@ toolchain go1.26.6
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/git-pkgs/archives v0.5.1
+	github.com/git-pkgs/archives v0.6.0
 	github.com/git-pkgs/clone v0.7.1
 	github.com/git-pkgs/enrichment v0.7.0
 	github.com/git-pkgs/forge v0.9.0
@@ -17,6 +17,7 @@ require (
 	github.com/git-pkgs/purl v0.1.19
 	github.com/git-pkgs/registries v0.8.0
 	github.com/git-pkgs/spdx v0.3.1
+	github.com/klauspost/compress v1.19.2
 	github.com/ulikunitz/xz v0.5.16
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1

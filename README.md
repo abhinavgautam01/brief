@@ -117,7 +117,7 @@ Use `--verbose` to include homepage, docs, and repo links for each detected tool
 
 ## Inspect
 
-`brief inspect` reports the format, architecture, linked libraries, and build metadata of native objects in binaries and package archives. It accepts ELF, Mach-O, PE, zip, tar, gzip, bzip2, and xz inputs, including wheels, gems, and JARs.
+`brief inspect` reports the format, architecture, linked libraries, and build metadata of native objects in binaries and package archives. It accepts ELF, Mach-O, PE, zip, tar, gzip, bzip2, xz, and zstd inputs, including wheels, gems, JARs, and conda packages.
 
 ```
 brief inspect build/tool
