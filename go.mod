@@ -15,7 +15,7 @@ require (
 	github.com/git-pkgs/manifests v0.10.0
 	github.com/git-pkgs/outline v0.2.1
 	github.com/git-pkgs/purl v0.1.19
-	github.com/git-pkgs/registries v0.8.0
+	github.com/git-pkgs/registries v0.8.1
 	github.com/git-pkgs/spdx v0.3.1
 	github.com/klauspost/compress v1.19.2
 	github.com/ulikunitz/xz v0.5.16
