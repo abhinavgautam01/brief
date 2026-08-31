@@ -292,7 +292,7 @@ Language ecosystems and development tools across multiple categories.
 
 **Languages:** Ada, C, C#, C++, COBOL, Clojure, Common Lisp, Crystal, D, Dart, Deno, Elixir, Elm, Emacs Lisp, Erlang, F#, Fortran, GDScript, Gleam, Go, Groovy, Haskell, Haxe, Java, JavaScript, Julia, Kotlin, Lua, Mojo, Nim, Nix, OCaml, Objective-C, Odin, PHP, Perl, Prolog, Python, R, Racket, Roc, Ruby, Rust, Scala, Scheme, Solidity, Swift, Tcl, TypeScript, V, VHDL, Verilog, Zig.
 
-**Package Managers:** Alire, Bun, Bundler, Cabal, Cargo, CocoaPods, Composer, Conan, Conda, DUB, Deno Modules, Flit, Gleam Packages, Go Modules, Gradle, Hatch, Haxelib, Maven, Mix, Nix Flakes, NuGet, PDM, Pipenv, Pkg, Poetry, Quicklisp, Shards, Swift Package Manager, Yarn, cpanm, dotnet CLI, elm, fpm, npm, opam, pip, pnpm, pub, rebar3, renv, sbt, setuptools, uv, vcpkg.
+**Package Managers:** Alire, Bun, Bundler, Cabal, Cargo, CocoaPods, Composer, Conan, Conda, DUB, Deno Modules, Flit, Gleam Packages, Go Modules, Gradle, Hatch, Haxelib, Jsonnet Bundler, Maven, Mint, Mix, Nix Flakes, NuGet, PDM, Pipenv, Pkg, Poetry, Quicklisp, Shards, Stack, Swift Package Manager, Yarn, cpanm, dotnet CLI, elm, fpm, npm, opam, pip, pnpm, pub, rebar3, renv, sbt, setuptools, uv, vcpkg.
 
 **Test:** ASV, AVA, Alcotest, Artillery, Bats, BenchmarkTools.jl, Bruno, Catch2, Cucumber, Cypress, EUnit, ExUnit, Gatling, Ginkgo, Google Test, Hspec, Hurl, JUnit, Jasmine, Jest, Kotest, Lighthouse CI, Locust, MSW, Minitest, Mocha, Newman, PHPUnit, Pest, Playwright, REST Client, RSpec, ScalaTest, Selenium, Testify, Testing Library, Vitest, XCTest, axe-core, benchmark-ips, cargo test, clojure.test, criterion, crystal spec, dart test, deno test, dotnet test, gleam test, go test, hyperfine, k6, kotlin.test, nf-test, pytest, pytest-benchmark, tape, testament, testthat, tinytest, tox, vdiffr, zig test.
 
@@ -304,7 +304,7 @@ Language ecosystems and development tools across multiple categories.
 
 **Docs:** Docsify, Documenter.jl, Docusaurus, Dokka, Doxygen, ExDoc, Hugo, Javadoc, Jekyll, MkDocs, MultiQC, MyST-Parser, Nextra, Quarto, R Markdown, Read the Docs, Redoc, Sphinx, Starlight, Storybook, Swagger UI, TypeDoc, VitePress, Yard, Zensical, cargo doc, dart doc, deno doc, knitr, mdBook, phpDocumentor, pkgdown, pkgsite, roxygen2.
 
-**Build:** Actix Web, AdonisJS, Angular, Astro, Autotools, Axum, CMake, Django, Dune, Echo, Electron, Eleventy, Ember.js, Express, FastAPI, Fastify, Fiber, Flask, Flutter, Foundry, Gatsby, Gin, GoReleaser, Hardhat, Hono, Invoke, Just, Koa, Laravel, Less, Mage, Make, Meson, NestJS, Next.js, Nextflow, Nuxt, Parcel, Phoenix, PostCSS, Qwik, Rails, Rake, React Native, Remix, Rocket, Rollup, Rspack, SWC, Sass, Sinatra, Snakemake, Spin, Spring Boot, Svelte, SvelteKit, Symfony, Task, Tauri, Vite, Vue, Webpack, cibuildwheel, cross, esbuild, nf-core, targets, tsup.
+**Build:** Actix Web, AdonisJS, Angular, Astro, Autotools, Axum, Babashka, BitBake, CMake, Django, Dune, Echo, Electron, Eleventy, Ember.js, Express, FastAPI, Fastify, Fiber, Flask, Flutter, Foundry, Gatsby, Gin, GoReleaser, Hardhat, Hono, Invoke, Just, Koa, Laravel, Less, Mage, Make, Meson, Meteor, NestJS, Next.js, Nextflow, Nuxt, Parcel, Phoenix, PostCSS, Qwik, Rails, Rake, React Native, Remix, Rocket, Rollup, Rspack, SWC, Sass, Sinatra, Snakemake, Spin, Spring Boot, Svelte, SvelteKit, Symfony, Task, Tauri, Vite, Vue, Webpack, cibuildwheel, cross, esbuild, nf-core, targets, tsup.
 
 **Native Ext:** Maturin, Neon, Rustler, meson-python, mkmf, napi-rs, node-gyp, phpize, rb-sys, setuptools Extension, setuptools-rust.
 
@@ -320,11 +320,11 @@ Language ecosystems and development tools across multiple categories.
 
 **Container:** Cloud Native Buildpacks, Dev Container, Docker, Docker Compose, Podman.
 
-**Infra:** AWS CDK, Ansible, CloudFormation, DVC, Dockstore, Helm, Kubernetes, Kustomize, Packer, Pulumi, Serverless Framework, Terraform, Vagrant.
+**Infra:** AWS CDK, Ansible, Argo CD, Chef, CloudFormation, DVC, Dockstore, Flux, Helm, Helmfile, Kubernetes, Kustomize, OpenTofu, Packer, Pulumi, Puppet, Serverless Framework, Terraform, Vagrant.
 
-**Monorepo:** Bazel, Cargo workspaces, Go workspace, Lerna, Moon, Nx, Pants, Rush, Turborepo, Yarn workspaces, pnpm workspaces.
+**Monorepo:** Bazel, Buck, Cargo workspaces, Go workspace, Lerna, Moon, Nx, Pants, Rush, Turborepo, Yarn workspaces, pnpm workspaces.
 
-**Environment:** Flipper, JetBrains IDE, Jupyter, LaunchDarkly, Mise, Pixi, Unleash, VS Code, Volta, asdf, direnv, dotenv, pyenv.
+**Environment:** Devbox, Flipper, JetBrains IDE, Jupyter, LaunchDarkly, Mise, Pixi, Unleash, VS Code, Volta, asdf, direnv, dotenv, pyenv.
 
 **i18n:** Crowdin, Fluent, FormatJS, Lingui, Rails i18n, Transifex, gettext, i18next, vue-i18n.
 

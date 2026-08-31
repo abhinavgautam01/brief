@@ -1,0 +1,21 @@
+[tool]
+name = "Babashka"
+category = "build"
+homepage = "https://babashka.org"
+docs = "https://book.babashka.org"
+repo = "https://github.com/babashka/babashka"
+description = "Clojure scripting runtime and task runner"
+
+[detect]
+files = ["bb.edn"]
+
+[commands]
+run = "bb tasks"
+alternatives = ["bb"]
+
+[config]
+files = ["bb.edn"]
+
+[taxonomy]
+role = ["build-tool"]
+function = ["automation"]

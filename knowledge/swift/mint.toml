@@ -1,0 +1,20 @@
+[tool]
+name = "Mint"
+category = "package_manager"
+homepage = "https://github.com/yonaskolb/Mint"
+docs = "https://github.com/yonaskolb/Mint#readme"
+repo = "https://github.com/yonaskolb/Mint"
+description = "Package manager for executable Swift packages"
+
+[detect]
+files = ["Mintfile"]
+
+[commands]
+run = "mint bootstrap"
+alternatives = ["mint run"]
+
+[config]
+files = ["Mintfile"]
+
+[taxonomy]
+role = ["package-manager"]

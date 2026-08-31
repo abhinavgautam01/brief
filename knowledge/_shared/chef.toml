@@ -1,0 +1,22 @@
+[tool]
+name = "Chef"
+category = "infrastructure"
+homepage = "https://www.chef.io"
+docs = "https://docs.chef.io"
+repo = "https://github.com/chef/chef"
+description = "Infrastructure automation and configuration management"
+
+[detect]
+files = ["metadata.rb", "metadata.json", "Berksfile"]
+
+[commands]
+run = "chef-client"
+alternatives = ["berks install", "chef exec"]
+
+[config]
+files = ["metadata.rb", "metadata.json", "Berksfile", "Berksfile.lock"]
+lockfile = "Berksfile.lock"
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]

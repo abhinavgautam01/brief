@@ -1,0 +1,22 @@
+[tool]
+name = "Meteor"
+category = "build"
+homepage = "https://www.meteor.com"
+docs = "https://docs.meteor.com"
+repo = "https://github.com/meteor/meteor"
+description = "Full-stack JavaScript application platform"
+
+[detect]
+files = ["package.js", ".meteor/versions", "versions.json"]
+
+[commands]
+run = "meteor run"
+alternatives = ["meteor build", "meteor test"]
+
+[config]
+files = ["package.js", ".meteor/versions", "versions.json"]
+
+[taxonomy]
+role = ["framework"]
+layer = ["full-stack", "frontend", "backend"]
+domain = ["web-development"]

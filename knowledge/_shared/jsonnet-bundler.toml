@@ -1,0 +1,21 @@
+[tool]
+name = "Jsonnet Bundler"
+category = "package_manager"
+homepage = "https://github.com/jsonnet-bundler/jsonnet-bundler"
+docs = "https://github.com/jsonnet-bundler/jsonnet-bundler#readme"
+repo = "https://github.com/jsonnet-bundler/jsonnet-bundler"
+description = "Package manager for Jsonnet dependencies"
+
+[detect]
+files = ["jsonnetfile.json", "jsonnetfile.lock.json"]
+
+[commands]
+run = "jb install"
+alternatives = ["jb update"]
+
+[config]
+files = ["jsonnetfile.json", "jsonnetfile.lock.json"]
+lockfile = "jsonnetfile.lock.json"
+
+[taxonomy]
+role = ["package-manager"]

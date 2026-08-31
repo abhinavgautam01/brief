@@ -36,6 +36,8 @@ const (
 	DefaultScanLimit = 10000
 	// DefaultLineCountTimeout bounds external line counters.
 	DefaultLineCountTimeout = 2 * time.Second
+	// contentGlobReadLimit bounds content inspected from each glob-matched file.
+	contentGlobReadLimit = 1 << 20
 
 	microsPerMS       = 1000.0
 	scanReadBatchSize = 128
@@ -868,6 +870,12 @@ func (e *Engine) loadFileExts() {
 // that point outside the root to prevent file disclosure attacks.
 // It opens the file via O_NOFOLLOW to avoid TOCTOU races between stat and read.
 func (e *Engine) safeReadFile(file string) ([]byte, error) {
+	return e.safeReadFileLimit(file, 0)
+}
+
+// safeReadFileLimit applies safeReadFile's path checks and reads at most limit
+// bytes. A non-positive limit reads the complete file.
+func (e *Engine) safeReadFileLimit(file string, limit int64) ([]byte, error) {
 	path := filepath.Join(e.Root, file)
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -889,8 +897,13 @@ func (e *Engine) safeReadFile(file string) ([]byte, error) {
 		if !targetInfo.Mode().IsRegular() {
 			return nil, fmt.Errorf("path is not a regular file: %s", file)
 		}
-		// Safe symlink within root: read the resolved target directly.
-		return os.ReadFile(target)
+		// Safe symlink within root: open the resolved target directly.
+		f, err := os.Open(target)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = f.Close() }()
+		return readFileLimit(f, limit)
 	}
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("path is not a regular file: %s", file)
@@ -902,7 +915,14 @@ func (e *Engine) safeReadFile(file string) ([]byte, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
-	return io.ReadAll(f)
+	return readFileLimit(f, limit)
+}
+
+func readFileLimit(r io.Reader, limit int64) ([]byte, error) {
+	if limit > 0 {
+		r = io.LimitReader(r, limit)
+	}
+	return io.ReadAll(r)
 }
 
 // contains checks if an exact file or any regular file matching a glob contains
@@ -936,7 +956,7 @@ func (e *Engine) globContains(pattern string, contentPatterns []string) bool {
 		if !e.matchesProjectPattern(pattern, rel) {
 			continue
 		}
-		data, err := e.safeReadFile(rel)
+		data, err := e.safeReadFileLimit(rel, contentGlobReadLimit)
 		if err == nil && containsAny(string(data), contentPatterns) {
 			return true
 		}

@@ -1,0 +1,18 @@
+[tool]
+name = "Flux"
+category = "infrastructure"
+homepage = "https://fluxcd.io"
+docs = "https://fluxcd.io/flux/"
+repo = "https://github.com/fluxcd/flux2"
+description = "GitOps continuous delivery toolkit for Kubernetes"
+
+[detect.file_contains]
+"**/*.yaml" = ["toolkit.fluxcd.io/"]
+"**/*.yml" = ["toolkit.fluxcd.io/"]
+
+[commands]
+run = "flux reconcile kustomization"
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]

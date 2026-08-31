@@ -509,7 +509,8 @@ func validateContentPath(source, field, pattern string) error {
 	if !HasGlobPattern(pattern) {
 		return nil
 	}
-	if HasGlobPattern(path.Base(pattern)) {
+	base := path.Base(pattern)
+	if HasGlobPattern(base) && base != "*.yaml" && base != "*.yml" {
 		return fmt.Errorf("%s: %s pattern %q must name a specific file", source, field, pattern)
 	}
 	return nil

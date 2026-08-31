@@ -195,6 +195,33 @@ func TestValidateRejectsBroadContentGlob(t *testing.T) {
 	}
 }
 
+func TestValidateAllowsYAMLContentGlob(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			FileContains: map[string][]string{
+				"**/*.yaml": {"api.example.io/"},
+				"**/*.yml":  {"api.example.io/"},
+			},
+		},
+	}}}
+	if err := base.Validate(); err != nil {
+		t.Fatalf("expected YAML content globs to be valid: %v", err)
+	}
+}
+
+func TestValidateRejectsNonYAMLContentGlob(t *testing.T) {
+	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+		Source: "knowledge/example.toml",
+		Detect: kb.DetectInfo{
+			FileContains: map[string][]string{"**/*.json": {"marker"}},
+		},
+	}}}
+	if err := base.Validate(); err == nil {
+		t.Fatal("expected non-YAML content glob validation error")
+	}
+}
+
 func TestValidateRejectsContentDirectory(t *testing.T) {
 	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
 		Source: "knowledge/example.toml",

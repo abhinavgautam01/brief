@@ -1,0 +1,21 @@
+[tool]
+name = "Helmfile"
+category = "infrastructure"
+homepage = "https://helmfile.readthedocs.io"
+docs = "https://helmfile.readthedocs.io"
+repo = "https://github.com/helmfile/helmfile"
+description = "Declarative deployment manager for Helm charts"
+
+[detect]
+files = ["helmfile.yaml", "helmfile.yaml.gotmpl", "helmfile.d/*.yaml", "helmfile.d/*.yaml.gotmpl"]
+
+[commands]
+run = "helmfile sync"
+alternatives = ["helmfile apply", "helmfile diff"]
+
+[config]
+files = ["helmfile.yaml", "helmfile.yaml.gotmpl", "helmfile.d/*.yaml", "helmfile.d/*.yaml.gotmpl"]
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]

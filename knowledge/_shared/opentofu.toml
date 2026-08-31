@@ -1,0 +1,22 @@
+[tool]
+name = "OpenTofu"
+category = "infrastructure"
+homepage = "https://opentofu.org"
+docs = "https://opentofu.org/docs/"
+repo = "https://github.com/opentofu/opentofu"
+description = "Open source infrastructure as code provisioning tool"
+
+[detect]
+files = ["*.tofu", "**/*.tofu"]
+
+[commands]
+run = "tofu plan"
+alternatives = ["tofu apply", "tofu init"]
+
+[config]
+files = ["*.tofu", "**/*.tofu", ".terraform.lock.hcl"]
+lockfile = ".terraform.lock.hcl"
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]

@@ -1,0 +1,20 @@
+[tool]
+name = "Buck"
+category = "monorepo"
+homepage = "https://buck2.build"
+docs = "https://buck2.build/docs/"
+repo = "https://github.com/facebook/buck2"
+description = "Large-scale build system for monorepos"
+
+[detect]
+files = ["BUCK", "**/BUCK", "METADATA.bzl", "**/METADATA.bzl"]
+
+[commands]
+run = "buck2 build //..."
+alternatives = ["buck2 test //...", "buck build //..."]
+
+[config]
+files = [".buckconfig", "BUCK", "**/BUCK", "METADATA.bzl", "**/METADATA.bzl"]
+
+[taxonomy]
+role = ["build-tool", "orchestrator"]
