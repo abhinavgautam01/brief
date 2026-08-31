@@ -7,8 +7,8 @@ repo = "https://github.com/argoproj/argo-cd"
 description = "Declarative GitOps continuous delivery for Kubernetes"
 
 [detect.file_contains]
-"**/*.yaml" = ["argoproj.io/"]
-"**/*.yml" = ["argoproj.io/"]
+"**/*.yaml" = ["kind: Application", "kind: AppProject", "kind: ApplicationSet"]
+"**/*.yml" = ["kind: Application", "kind: AppProject", "kind: ApplicationSet"]
 
 [commands]
 run = "argocd app sync"

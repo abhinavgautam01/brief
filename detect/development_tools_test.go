@@ -169,6 +169,13 @@ func TestMissingDevelopmentToolSignals(t *testing.T) {
 			notTool:  "Flux",
 		},
 		{
+			name:     "Argo CD ApplicationSet manifest",
+			files:    map[string]string{"deploy/applicationset.yaml": "apiVersion: argoproj.io/v1alpha1\nkind: ApplicationSet\n"},
+			category: "infrastructure",
+			tool:     "Argo CD",
+			notTool:  "Flux",
+		},
+		{
 			name:     "Flux YAML manifest",
 			files:    map[string]string{"clusters/flux.yaml": "apiVersion: source.toolkit.fluxcd.io/v1\nkind: GitRepository\n"},
 			category: "infrastructure",
@@ -252,10 +259,28 @@ func TestMissingDevelopmentToolFixtures(t *testing.T) {
 }
 
 func TestGitOpsContentDetectionIgnoresGenericKubernetesYAML(t *testing.T) {
-	dir := t.TempDir()
-	writeProjectFile(t, dir, "deploy/deployment.yaml", "apiVersion: apps/v1\nkind: Deployment\n")
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "generic Kubernetes manifest",
+			content: "apiVersion: apps/v1\nkind: Deployment\n",
+		},
+		{
+			name:    "Argo Workflows manifest",
+			content: "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\n",
+		},
+	}
 
-	report := runOn(t, dir)
-	assertToolNotDetected(t, report, "infrastructure", "Argo CD")
-	assertToolNotDetected(t, report, "infrastructure", "Flux")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeProjectFile(t, dir, "deploy/manifest.yaml", test.content)
+
+			report := runOn(t, dir)
+			assertToolNotDetected(t, report, "infrastructure", "Argo CD")
+			assertToolNotDetected(t, report, "infrastructure", "Flux")
+		})
+	}
 }

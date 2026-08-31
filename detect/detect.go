@@ -897,8 +897,9 @@ func (e *Engine) safeReadFileLimit(file string, limit int64) ([]byte, error) {
 		if !targetInfo.Mode().IsRegular() {
 			return nil, fmt.Errorf("path is not a regular file: %s", file)
 		}
-		// Safe symlink within root: open the resolved target directly.
-		f, err := os.Open(target)
+		// Safe symlink within root: open the resolved target without following
+		// a symlink swapped into place after the checks above.
+		f, err := openNoFollow(target)
 		if err != nil {
 			return nil, err
 		}
