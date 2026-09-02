@@ -608,6 +608,13 @@ func (e *Engine) matchTool(tool *kb.ToolDef) brief.Confidence {
 		}
 	}
 
+	for _, resource := range tool.Detect.YAMLResources {
+		if e.hasYAMLResource(resource) {
+			best = brief.ConfidenceHigh
+			break
+		}
+	}
+
 	if len(tool.Detect.Dependencies) > 0 || len(tool.Detect.DevDependencies) > 0 {
 		if e.hasDependency(tool) {
 			best = brief.ConfidenceHigh
@@ -969,6 +976,41 @@ func containsAny(content string, patterns []string) bool {
 	for _, p := range patterns {
 		if strings.Contains(content, p) {
 			return true
+		}
+	}
+	return false
+}
+
+type yamlResource struct {
+	APIVersion string `yaml:"apiVersion"`
+	Kind       string `yaml:"kind"`
+}
+
+func (e *Engine) hasYAMLResource(signal kb.YAMLResourceInfo) bool {
+	e.loadProjectFiles()
+	for _, rel := range e.projectFiles {
+		ext := strings.ToLower(filepath.Ext(rel))
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+
+		data, err := e.safeReadFileLimit(rel, contentGlobReadLimit)
+		if err != nil {
+			continue
+		}
+		decoder := yaml.NewDecoder(bytes.NewReader(data))
+		for {
+			var resource yamlResource
+			if err := decoder.Decode(&resource); err != nil {
+				break
+			}
+			group, _, found := strings.Cut(resource.APIVersion, "/")
+			if !found || !slices.Contains(signal.APIGroups, group) {
+				continue
+			}
+			if len(signal.Kinds) == 0 || slices.Contains(signal.Kinds, resource.Kind) {
+				return true
+			}
 		}
 	}
 	return false

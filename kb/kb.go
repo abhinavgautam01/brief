@@ -45,7 +45,15 @@ type DetectInfo struct {
 	FileContains        map[string][]string `toml:"file_contains"`
 	ExcludeFileContains map[string][]string `toml:"exclude_file_contains"`
 	KeyExists           map[string][]string `toml:"key_exists"`
+	YAMLResources       []YAMLResourceInfo  `toml:"yaml_resources"`
 	Ecosystems          []string            `toml:"ecosystems"`
+}
+
+// YAMLResourceInfo identifies Kubernetes-style YAML resources by API group and
+// optional kinds. Both fields are matched within the same YAML document.
+type YAMLResourceInfo struct {
+	APIGroups []string `toml:"api_groups"`
+	Kinds     []string `toml:"kinds"`
 }
 
 // CommandInfo holds the commands associated with a tool.
@@ -448,7 +456,7 @@ func (base *KnowledgeBase) Validate() error {
 func validateToolPaths(tool *ToolDef) error {
 	total := len(tool.Detect.Files) + len(tool.Detect.ExcludeFiles) +
 		len(tool.Detect.FileContains) + len(tool.Detect.ExcludeFileContains) +
-		len(tool.Detect.KeyExists) + len(tool.Config.Files)
+		len(tool.Detect.KeyExists) + len(tool.Detect.YAMLResources) + len(tool.Config.Files)
 	if tool.Config.Lockfile != "" {
 		total++
 	}
@@ -496,6 +504,21 @@ func validateToolPaths(tool *ToolDef) error {
 			return err
 		}
 	}
+	for i, resource := range tool.Detect.YAMLResources {
+		if len(resource.APIGroups) == 0 {
+			return fmt.Errorf("%s: detect.yaml_resources[%d].api_groups must not be empty", tool.Source, i)
+		}
+		for _, group := range resource.APIGroups {
+			if strings.TrimSpace(group) == "" {
+				return fmt.Errorf("%s: detect.yaml_resources[%d].api_groups must not contain empty values", tool.Source, i)
+			}
+		}
+		for _, kind := range resource.Kinds {
+			if strings.TrimSpace(kind) == "" {
+				return fmt.Errorf("%s: detect.yaml_resources[%d].kinds must not contain empty values", tool.Source, i)
+			}
+		}
+	}
 	return nil
 }
 
@@ -509,8 +532,7 @@ func validateContentPath(source, field, pattern string) error {
 	if !HasGlobPattern(pattern) {
 		return nil
 	}
-	base := path.Base(pattern)
-	if HasGlobPattern(base) && base != "*.yaml" && base != "*.yml" {
+	if HasGlobPattern(path.Base(pattern)) {
 		return fmt.Errorf("%s: %s pattern %q must name a specific file", source, field, pattern)
 	}
 	return nil

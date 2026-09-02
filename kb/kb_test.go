@@ -195,31 +195,43 @@ func TestValidateRejectsBroadContentGlob(t *testing.T) {
 	}
 }
 
-func TestValidateAllowsYAMLContentGlob(t *testing.T) {
+func TestValidateRejectsExtensionContentGlob(t *testing.T) {
 	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
 		Source: "knowledge/example.toml",
 		Detect: kb.DetectInfo{
-			FileContains: map[string][]string{
-				"**/*.yaml": {"api.example.io/"},
-				"**/*.yml":  {"api.example.io/"},
-			},
-		},
-	}}}
-	if err := base.Validate(); err != nil {
-		t.Fatalf("expected YAML content globs to be valid: %v", err)
-	}
-}
-
-func TestValidateRejectsNonYAMLContentGlob(t *testing.T) {
-	base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
-		Source: "knowledge/example.toml",
-		Detect: kb.DetectInfo{
-			FileContains: map[string][]string{"**/*.json": {"marker"}},
+			FileContains: map[string][]string{"**/*.yaml": {"marker"}},
 		},
 	}}}
 	if err := base.Validate(); err == nil {
-		t.Fatal("expected non-YAML content glob validation error")
+		t.Fatal("expected extension content glob validation error")
 	}
+}
+
+func TestValidateYAMLResources(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+			Source: "knowledge/example.toml",
+			Detect: kb.DetectInfo{YAMLResources: []kb.YAMLResourceInfo{{
+				APIGroups: []string{"example.io"},
+				Kinds:     []string{"Example"},
+			}}},
+		}}}
+		if err := base.Validate(); err != nil {
+			t.Fatalf("expected valid YAML resource signal: %v", err)
+		}
+	})
+
+	t.Run("missing API group", func(t *testing.T) {
+		base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+			Source: "knowledge/example.toml",
+			Detect: kb.DetectInfo{YAMLResources: []kb.YAMLResourceInfo{{
+				Kinds: []string{"Example"},
+			}}},
+		}}}
+		if err := base.Validate(); err == nil {
+			t.Fatal("expected missing YAML resource API group validation error")
+		}
+	})
 }
 
 func TestValidateRejectsContentDirectory(t *testing.T) {

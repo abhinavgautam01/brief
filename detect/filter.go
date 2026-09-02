@@ -291,7 +291,8 @@ func matchesConfigFiles(tool *kb.ToolDef, changed map[string]bool) bool {
 
 func matchesDetectionPatterns(tool *kb.ToolDef, changed map[string]bool, changedExts map[string]bool) bool {
 	return matchesPathPatterns(tool.Detect.Files, changed, changedExts) ||
-		matchesPathPatterns(tool.Detect.ExcludeFiles, changed, changedExts)
+		matchesPathPatterns(tool.Detect.ExcludeFiles, changed, changedExts) ||
+		(len(tool.Detect.YAMLResources) > 0 && (changedExts[".yaml"] || changedExts[".yml"]))
 }
 
 func matchesPathPatterns(patterns []string, changed map[string]bool, changedExts map[string]bool) bool {

@@ -196,6 +196,21 @@ func TestToolMatchesChangedFiles_FileContainsGlob(t *testing.T) {
 	}
 }
 
+func TestToolMatchesChangedFiles_YAMLResource(t *testing.T) {
+	tool := &kb.ToolDef{
+		Detect: kb.DetectInfo{
+			YAMLResources: []kb.YAMLResourceInfo{{APIGroups: []string{"example.io"}}},
+		},
+	}
+
+	if !toolMatchesChangedFiles(tool, map[string]bool{"deploy/example.yaml": true}, map[string]bool{".yaml": true}) {
+		t.Error("expected YAML resource tool to match changed YAML file")
+	}
+	if toolMatchesChangedFiles(tool, map[string]bool{"deploy/example.json": true}, map[string]bool{".json": true}) {
+		t.Error("expected YAML resource tool not to match changed non-YAML file")
+	}
+}
+
 func TestToolMatchesChangedFiles_ExcludeFileContains(t *testing.T) {
 	tool := &kb.ToolDef{
 		Detect: kb.DetectInfo{

@@ -271,6 +271,15 @@ func TestGitOpsContentDetectionIgnoresGenericKubernetesYAML(t *testing.T) {
 			name:    "Argo Workflows manifest",
 			content: "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\n",
 		},
+		{
+			name:    "KubeVela application manifest",
+			content: "apiVersion: core.oam.dev/v1beta1\nkind: Application\n",
+		},
+		{
+			name: "markers split across YAML documents",
+			content: "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\n" +
+				"---\napiVersion: core.oam.dev/v1beta1\nkind: Application\n",
+		},
 	}
 
 	for _, test := range tests {
