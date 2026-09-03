@@ -1,0 +1,21 @@
+[tool]
+name = "Puppet"
+category = "infrastructure"
+homepage = "https://www.puppet.com"
+docs = "https://help.puppet.com/core/"
+repo = "https://github.com/puppetlabs/puppet"
+description = "Infrastructure automation and configuration management"
+
+[detect]
+files = ["Puppetfile"]
+
+[commands]
+run = "puppet apply"
+alternatives = ["r10k puppetfile install"]
+
+[config]
+files = ["Puppetfile"]
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]

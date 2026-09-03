@@ -1,0 +1,1 @@
+Package.describe({ name: "example:package", version: "1.0.0" });

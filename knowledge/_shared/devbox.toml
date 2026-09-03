@@ -1,0 +1,22 @@
+[tool]
+name = "Devbox"
+category = "environment"
+homepage = "https://www.jetify.com/devbox"
+docs = "https://www.jetify.com/docs/devbox"
+repo = "https://github.com/jetify-com/devbox"
+description = "Portable development environment manager powered by Nix"
+
+[detect]
+files = ["devbox.json", "devbox.lock"]
+
+[commands]
+run = "devbox shell"
+alternatives = ["devbox install", "devbox run"]
+
+[config]
+files = ["devbox.json", "devbox.lock"]
+lockfile = "devbox.lock"
+
+[taxonomy]
+role = ["cli-tool"]
+function = ["runtime-management"]

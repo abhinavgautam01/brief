@@ -85,6 +85,17 @@ Checks if a file contains a specific string. Useful for tools configured inside 
 "pyproject.toml" = ["[tool.ruff]"]
 ```
 
+### yaml_resources (high confidence)
+
+Matches Kubernetes-style YAML resources by API group and, optionally, kind.
+Both values must occur in the same YAML document.
+
+```toml
+[[detect.yaml_resources]]
+api_groups = ["argoproj.io"]
+kinds = ["Application", "AppProject", "ApplicationSet"]
+```
+
 ### key_exists (medium confidence)
 
 Checks if a dot-separated key path exists in a JSON or TOML file. Useful for checking if a tool has configuration in a structured file.

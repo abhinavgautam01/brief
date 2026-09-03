@@ -1,0 +1,20 @@
+[tool]
+name = "BitBake"
+category = "build"
+homepage = "https://www.openembedded.org/wiki/BitBake"
+docs = "https://docs.yoctoproject.org/bitbake/"
+repo = "https://github.com/openembedded/bitbake"
+description = "Task executor and build engine for embedded Linux"
+
+[detect]
+files = ["*.bb", "**/*.bb", "*.bbappend", "**/*.bbappend"]
+
+[commands]
+run = "bitbake"
+
+[config]
+files = ["*.bb", "**/*.bb", "*.bbappend", "**/*.bbappend"]
+
+[taxonomy]
+role = ["build-tool"]
+function = ["automation"]

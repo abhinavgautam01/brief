@@ -1,0 +1,23 @@
+[tool]
+name = "Flux"
+category = "infrastructure"
+homepage = "https://fluxcd.io"
+docs = "https://fluxcd.io/flux/"
+repo = "https://github.com/fluxcd/flux2"
+description = "GitOps continuous delivery toolkit for Kubernetes"
+
+[[detect.yaml_resources]]
+api_groups = [
+  "helm.toolkit.fluxcd.io",
+  "image.toolkit.fluxcd.io",
+  "kustomize.toolkit.fluxcd.io",
+  "notification.toolkit.fluxcd.io",
+  "source.toolkit.fluxcd.io",
+]
+
+[commands]
+run = "flux reconcile kustomization"
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]

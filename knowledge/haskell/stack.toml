@@ -1,0 +1,21 @@
+[tool]
+name = "Stack"
+category = "package_manager"
+homepage = "https://www.haskellstack.org"
+docs = "https://docs.haskellstack.org"
+repo = "https://github.com/commercialhaskell/stack"
+description = "Haskell build tool and package manager"
+
+[detect]
+files = ["stack.yaml"]
+
+[commands]
+run = "stack build"
+alternatives = ["stack test", "stack install"]
+
+[config]
+files = ["stack.yaml", "stack.yaml.lock"]
+lockfile = "stack.yaml.lock"
+
+[taxonomy]
+role = ["package-manager"]

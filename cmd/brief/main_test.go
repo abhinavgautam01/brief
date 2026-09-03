@@ -16,6 +16,7 @@ const scanHelperRootEnv = "BRIEF_SCAN_HELPER_ROOT"
 const diffHelperEnv = "BRIEF_DIFF_HELPER"
 const submoduleHelperRootEnv = "BRIEF_SUBMODULE_HELPER_ROOT"
 const submoduleDiffHelperEnv = "BRIEF_SUBMODULE_DIFF_HELPER"
+const yamlResourceDiffHelperEnv = "BRIEF_YAML_RESOURCE_DIFF_HELPER"
 
 func TestScanDefaultsBoundRecursiveDetection(t *testing.T) {
 	if root := os.Getenv(scanHelperRootEnv); root != "" {
@@ -76,6 +77,39 @@ func TestDiffAppliesScanOverrides(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "scan limit must not be negative") {
 		t.Fatalf("diff command output = %q, want scan limit validation error", out)
+	}
+}
+
+func TestDiffReportsYAMLResourceWithUppercaseExtension(t *testing.T) {
+	if os.Getenv(yamlResourceDiffHelperEnv) != "" {
+		cmdDiff([]string{"-json", "HEAD"})
+		os.Exit(0)
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+
+	dir := t.TempDir()
+	initGitScanFixture(t, dir)
+	writeScanFixture(t, dir, "README.md", "# Example\n")
+	runGitFixture(t, dir, "add", "README.md")
+	runGitFixture(t, dir, "commit", "-q", "-m", "initial")
+	writeScanFixture(t, dir, "manifest.YAML", "apiVersion: argoproj.io/v1alpha1\nkind: Application\n")
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestDiffReportsYAMLResourceWithUppercaseExtension$")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), yamlResourceDiffHelperEnv+"=1")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("diff command failed: %v", err)
+	}
+
+	var report brief.Report
+	if err := json.Unmarshal(out, &report); err != nil {
+		t.Fatalf("parsing diff output: %v\n%s", err, out)
+	}
+	if !reportHasTool(&report, "infrastructure", "Argo CD") {
+		t.Fatalf("tools = %+v, want Argo CD from changed manifest.YAML", report.Tools)
 	}
 }
 

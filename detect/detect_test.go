@@ -2695,6 +2695,15 @@ func TestFileContainsGlob(t *testing.T) {
 			t.Error("exact file_contains path should retain its existing behavior")
 		}
 	})
+
+	t.Run("bounded read", func(t *testing.T) {
+		dir := t.TempDir()
+		writeProjectFile(t, dir, "deploy/large.yaml", strings.Repeat("x", contentGlobReadLimit)+marker)
+
+		if New(loadKB(t), dir).contains("**/*.yaml", []string{marker}) {
+			t.Error("file_contains glob should not inspect content beyond its read limit")
+		}
+	})
 }
 
 func TestDirectoryGlobPattern(t *testing.T) {

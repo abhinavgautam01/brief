@@ -1,0 +1,18 @@
+[tool]
+name = "Argo CD"
+category = "infrastructure"
+homepage = "https://argo-cd.readthedocs.io"
+docs = "https://argo-cd.readthedocs.io/en/stable/"
+repo = "https://github.com/argoproj/argo-cd"
+description = "Declarative GitOps continuous delivery for Kubernetes"
+
+[[detect.yaml_resources]]
+api_groups = ["argoproj.io"]
+kinds = ["Application", "AppProject", "ApplicationSet"]
+
+[commands]
+run = "argocd app sync"
+
+[taxonomy]
+layer = ["infrastructure"]
+function = ["deployment"]
