@@ -27,7 +27,7 @@ func newFilterContext(knowledgeBase *kb.KnowledgeBase, changedFiles []string) *f
 	changedExts := make(map[string]bool)
 	for _, f := range changedFiles {
 		if ext := filepath.Ext(f); ext != "" {
-			changedExts[ext] = true
+			changedExts[strings.ToLower(ext)] = true
 		}
 	}
 

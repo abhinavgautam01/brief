@@ -221,17 +221,38 @@ func TestValidateYAMLResources(t *testing.T) {
 		}
 	})
 
-	t.Run("missing API group", func(t *testing.T) {
-		base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
-			Source: "knowledge/example.toml",
-			Detect: kb.DetectInfo{YAMLResources: []kb.YAMLResourceInfo{{
-				Kinds: []string{"Example"},
-			}}},
-		}}}
-		if err := base.Validate(); err == nil {
-			t.Fatal("expected missing YAML resource API group validation error")
-		}
-	})
+	tests := []struct {
+		name     string
+		resource kb.YAMLResourceInfo
+	}{
+		{
+			name:     "missing API group",
+			resource: kb.YAMLResourceInfo{Kinds: []string{"Example"}},
+		},
+		{
+			name:     "blank API group",
+			resource: kb.YAMLResourceInfo{APIGroups: []string{" "}},
+		},
+		{
+			name: "blank kind",
+			resource: kb.YAMLResourceInfo{
+				APIGroups: []string{"example.io"},
+				Kinds:     []string{" "},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			base := &kb.KnowledgeBase{Tools: []*kb.ToolDef{{
+				Source: "knowledge/example.toml",
+				Detect: kb.DetectInfo{YAMLResources: []kb.YAMLResourceInfo{test.resource}},
+			}}}
+			if err := base.Validate(); err == nil {
+				t.Fatal("expected YAML resource validation error")
+			}
+		})
+	}
 }
 
 func TestValidateRejectsContentDirectory(t *testing.T) {

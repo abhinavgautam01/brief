@@ -504,18 +504,22 @@ func validateToolPaths(tool *ToolDef) error {
 			return err
 		}
 	}
-	for i, resource := range tool.Detect.YAMLResources {
+	return validateYAMLResources(tool.Source, tool.Detect.YAMLResources)
+}
+
+func validateYAMLResources(source string, resources []YAMLResourceInfo) error {
+	for i, resource := range resources {
 		if len(resource.APIGroups) == 0 {
-			return fmt.Errorf("%s: detect.yaml_resources[%d].api_groups must not be empty", tool.Source, i)
+			return fmt.Errorf("%s: detect.yaml_resources[%d].api_groups must not be empty", source, i)
 		}
 		for _, group := range resource.APIGroups {
 			if strings.TrimSpace(group) == "" {
-				return fmt.Errorf("%s: detect.yaml_resources[%d].api_groups must not contain empty values", tool.Source, i)
+				return fmt.Errorf("%s: detect.yaml_resources[%d].api_groups must not contain empty values", source, i)
 			}
 		}
 		for _, kind := range resource.Kinds {
 			if strings.TrimSpace(kind) == "" {
-				return fmt.Errorf("%s: detect.yaml_resources[%d].kinds must not contain empty values", tool.Source, i)
+				return fmt.Errorf("%s: detect.yaml_resources[%d].kinds must not contain empty values", source, i)
 			}
 		}
 	}
