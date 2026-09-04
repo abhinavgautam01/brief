@@ -137,3 +137,17 @@ func TestPackageBuildToolFixtures(t *testing.T) {
 		})
 	}
 }
+
+func TestCondaBuildOffersRattlerBuildForV1Recipes(t *testing.T) {
+	report := runOn(t, "../testdata/conda-build-project")
+	for _, tool := range report.Tools["build"] {
+		if tool.Name != "Conda Build" {
+			continue
+		}
+		if tool.Command == nil || !slices.Contains(tool.Command.Alternatives, "rattler-build build") {
+			t.Fatalf("Conda Build command = %+v, want rattler-build alternative", tool.Command)
+		}
+		return
+	}
+	t.Fatal("expected Conda Build in build category")
+}

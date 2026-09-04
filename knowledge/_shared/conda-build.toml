@@ -11,7 +11,7 @@ files = ["meta.yaml", "meta.yml", "recipe/meta.yaml", "recipe/meta.yml", "recipe
 
 [commands]
 run = "conda-build ."
-alternatives = ["conda render ."]
+alternatives = ["rattler-build build", "conda render ."]
 
 [config]
 files = ["meta.yaml", "meta.yml", "recipe/meta.yaml", "recipe/meta.yml", "recipe/recipe.yaml", "recipe/recipe.yml"]
