@@ -38,6 +38,21 @@ func TestScanResourceVariants(t *testing.T) {
 		{"conduct similar names", []string{"CODE-OF-CONDUCT.txt.bak", "docs/CODE-OF-CONDUCT-POLICY.md"}, "community", "code_of_conduct", ""},
 		{"cla similar names", []string{"CONTRIBUTOR LICENSE AGREEMENT.md.bak", "docs/CONTRIBUTOR LICENSE AGREEMENT POLICY.md"}, "legal", "cla", ""},
 		{"change similar names", []string{"CHANGE.md.bak", "CHANGE-REQUEST.md"}, "", "changelog", ""},
+		{"accessibility root", []string{"ACCESSIBILITY.md"}, "community", "accessibility", "ACCESSIBILITY.md"},
+		{"accessibility github", []string{".github/ACCESSIBILITY.md"}, "community", "accessibility", ".github/ACCESSIBILITY.md"},
+		{"accessibility docs", []string{"docs/ACCESSIBILITY.md"}, "community", "accessibility", "docs/ACCESSIBILITY.md"},
+		{"accessibility gitlab", []string{".gitlab/ACCESSIBILITY.md"}, "community", "accessibility", ".gitlab/ACCESSIBILITY.md"},
+		{"accessibility no extension", []string{"ACCESSIBILITY"}, "community", "accessibility", "ACCESSIBILITY"},
+		{"accessibility text", []string{".github/ACCESSIBILITY.txt"}, "community", "accessibility", ".github/ACCESSIBILITY.txt"},
+		{"accessibility rst", []string{"docs/ACCESSIBILITY.rst"}, "community", "accessibility", "docs/ACCESSIBILITY.rst"},
+		{"accessibility adoc", []string{".gitlab/ACCESSIBILITY.adoc"}, "community", "accessibility", ".gitlab/ACCESSIBILITY.adoc"},
+		{"accessibility mixed case", []string{"docs/Accessibility.MD"}, "community", "accessibility", "docs/Accessibility.MD"},
+		{"accessibility root precedence", []string{"ACCESSIBILITY.md", ".github/ACCESSIBILITY.md", "docs/ACCESSIBILITY.md"}, "community", "accessibility", "ACCESSIBILITY.md"},
+		{"accessibility github precedence", []string{".github/ACCESSIBILITY.md", "docs/ACCESSIBILITY.md"}, "community", "accessibility", ".github/ACCESSIBILITY.md"},
+		{"accessibility docs precedence", []string{"docs/ACCESSIBILITY.md", ".gitlab/ACCESSIBILITY.md"}, "community", "accessibility", "docs/ACCESSIBILITY.md"},
+		{"accessibility similar names", []string{"ACCESSIBILITY.md.bak", "docs/Accessibility-Testing.md"}, "community", "accessibility", ""},
+		{"accessibility unrelated directory", []string{"src/ACCESSIBILITY.md"}, "community", "accessibility", ""},
+		{"accessibility absent", nil, "community", "accessibility", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
