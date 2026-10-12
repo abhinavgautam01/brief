@@ -14,8 +14,8 @@ func (e *Engine) detectCodemeta(path string) *brief.CodemetaInfo {
 	info := &brief.CodemetaInfo{Path: path}
 	data, err := e.safeReadFileLimit(path, codemetaByteLimit+1)
 	if err != nil {
-		info.ParseStatus = "read_error"
-		info.Diagnostics = []brief.CodemetaDiagnostic{{Code: "read_error", Message: err.Error()}}
+		info.ParseStatus = statusReadError
+		info.Diagnostics = []brief.CodemetaDiagnostic{{Code: statusReadError, Message: err.Error()}}
 		return info
 	}
 	doc, err := codemeta.ParseWithOptions(data, codemeta.ParseOptions{MaxBytes: codemetaByteLimit})
@@ -23,7 +23,7 @@ func (e *Engine) detectCodemeta(path string) *brief.CodemetaInfo {
 		info.ParseStatus = "syntax_error"
 		switch {
 		case errors.Is(err, codemeta.ErrLimit):
-			info.ParseStatus = "limit_exceeded"
+			info.ParseStatus = statusLimitExceeded
 		case errors.Is(err, codemeta.ErrUnsupported):
 			info.ParseStatus = "unsupported_syntax"
 		case errors.Is(err, codemeta.ErrType):
@@ -35,7 +35,7 @@ func (e *Engine) detectCodemeta(path string) *brief.CodemetaInfo {
 		}
 		return info
 	}
-	info.ParseStatus = "parsed"
+	info.ParseStatus = statusParsed
 	info.ValidationStatus = "valid"
 	info.ContextVersion = string(doc.Version())
 	info.Name = strings.Join(doc.Strings("name"), ", ")
@@ -47,11 +47,11 @@ func (e *Engine) detectCodemeta(path string) *brief.CodemetaInfo {
 	info.ProgrammingLanguages = doc.Strings("programmingLanguage")
 	info.Authors = codemetaAuthors(doc.Author())
 	for _, issue := range doc.Validate() {
-		if info.ValidationStatus != "unsupported_version" {
+		if info.ValidationStatus != statusUnsupportedVersion {
 			info.ValidationStatus = "invalid"
 		}
-		if issue.Code == "unsupported_version" {
-			info.ValidationStatus = "unsupported_version"
+		if issue.Code == statusUnsupportedVersion {
+			info.ValidationStatus = statusUnsupportedVersion
 		}
 		info.Diagnostics = append(info.Diagnostics, codemetaDiagnostic(issue))
 	}

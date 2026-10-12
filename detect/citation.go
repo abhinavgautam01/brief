@@ -9,12 +9,19 @@ import (
 
 const citationByteLimit = 1 << 20
 
+const (
+	statusReadError          = "read_error"
+	statusLimitExceeded      = "limit_exceeded"
+	statusParsed             = "parsed"
+	statusUnsupportedVersion = "unsupported_version"
+)
+
 func (e *Engine) detectCitation(path string) *brief.CitationInfo {
 	info := &brief.CitationInfo{Path: path}
 	data, err := e.safeReadFileLimit(path, citationByteLimit+1)
 	if err != nil {
-		info.ParseStatus = "read_error"
-		info.Diagnostics = []brief.CitationDiagnostic{{Code: "read_error", Message: err.Error()}}
+		info.ParseStatus = statusReadError
+		info.Diagnostics = []brief.CitationDiagnostic{{Code: statusReadError, Message: err.Error()}}
 		return info
 	}
 	doc, err := citation.ParseWithOptions(data, citation.ParseOptions{MaxBytes: citationByteLimit})
@@ -22,7 +29,7 @@ func (e *Engine) detectCitation(path string) *brief.CitationInfo {
 		info.ParseStatus = "syntax_error"
 		switch {
 		case errors.Is(err, citation.ErrLimit):
-			info.ParseStatus = "limit_exceeded"
+			info.ParseStatus = statusLimitExceeded
 		case errors.Is(err, citation.ErrUnsupported):
 			info.ParseStatus = "unsupported_syntax"
 		case errors.Is(err, citation.ErrType):
@@ -34,12 +41,12 @@ func (e *Engine) detectCitation(path string) *brief.CitationInfo {
 		}
 		return info
 	}
-	info.ParseStatus = "parsed"
+	info.ParseStatus = statusParsed
 	info.ValidationStatus = "valid"
 	for _, issue := range doc.Validate() {
 		info.ValidationStatus = "invalid"
-		if issue.Code == "unsupported_version" {
-			info.ValidationStatus = "unsupported_version"
+		if issue.Code == statusUnsupportedVersion {
+			info.ValidationStatus = statusUnsupportedVersion
 		}
 		info.Diagnostics = append(info.Diagnostics, citationDiagnostic(issue))
 	}

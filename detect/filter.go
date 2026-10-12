@@ -224,30 +224,36 @@ func (fc *filterContext) filterResources(res *brief.ResourceInfo, changedFiles [
 		out.ReadmeBibTeX = res.ReadmeBibTeX
 	}
 
-	if t := res.Templates; t != nil {
-		ft := &brief.TemplateInfo{}
-		for _, p := range t.Issue {
-			if hit(p) {
-				ft.Issue = append(ft.Issue, p)
-			}
-		}
-		for _, p := range t.PullRequest {
-			if hit(p) {
-				ft.PullRequest = append(ft.PullRequest, p)
-			}
-		}
-		if hit(t.Config) {
-			ft.Config = t.Config
-		}
-		if !ft.Empty() {
-			out.Templates = ft
-		}
-	}
+	out.Templates = filterTemplates(res.Templates, hit)
 
 	if out.Empty() {
 		return nil
 	}
 	return out
+}
+
+func filterTemplates(t *brief.TemplateInfo, hit func(string) bool) *brief.TemplateInfo {
+	if t == nil {
+		return nil
+	}
+	ft := &brief.TemplateInfo{}
+	for _, p := range t.Issue {
+		if hit(p) {
+			ft.Issue = append(ft.Issue, p)
+		}
+	}
+	for _, p := range t.PullRequest {
+		if hit(p) {
+			ft.PullRequest = append(ft.PullRequest, p)
+		}
+	}
+	if hit(t.Config) {
+		ft.Config = t.Config
+	}
+	if ft.Empty() {
+		return nil
+	}
+	return ft
 }
 
 func (fc *filterContext) filterPlatforms(plat *brief.PlatformInfo, changedFiles []string) *brief.PlatformInfo {

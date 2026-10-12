@@ -9,12 +9,7 @@ import (
 	"github.com/git-pkgs/brief"
 )
 
-const (
-	bibtexByteLimit     = 1 << 20
-	bibtexReadError     = "read_error"
-	bibtexLimitExceeded = "limit_exceeded"
-	bibtexParsed        = "parsed"
-)
+const bibtexByteLimit = 1 << 20
 
 // detectBibTeX parses a .bib file, or with extract set finds entries embedded
 // in a document such as a README or a CITATION file in another format.
@@ -22,8 +17,8 @@ func (e *Engine) detectBibTeX(path string, extract bool) *brief.BibTeXInfo {
 	info := &brief.BibTeXInfo{Path: path}
 	data, err := e.safeReadFileLimit(path, bibtexByteLimit+1)
 	if err != nil {
-		info.ParseStatus = bibtexReadError
-		info.Diagnostics = []brief.CitationDiagnostic{{Code: bibtexReadError, Message: err.Error()}}
+		info.ParseStatus = statusReadError
+		info.Diagnostics = []brief.CitationDiagnostic{{Code: statusReadError, Message: err.Error()}}
 		return info
 	}
 	opts := bibtex.ParseOptions{MaxBytes: bibtexByteLimit}
@@ -36,7 +31,7 @@ func (e *Engine) detectBibTeX(path string, extract bool) *brief.BibTeXInfo {
 	if err != nil {
 		switch {
 		case errors.Is(err, bibtex.ErrLimit):
-			info.ParseStatus = bibtexLimitExceeded
+			info.ParseStatus = statusLimitExceeded
 		case errors.Is(err, bibtex.ErrUnsupported):
 			info.ParseStatus = "unsupported_encoding"
 		default:
@@ -48,7 +43,7 @@ func (e *Engine) detectBibTeX(path string, extract bool) *brief.BibTeXInfo {
 		}
 		return info
 	}
-	info.ParseStatus = bibtexParsed
+	info.ParseStatus = statusParsed
 	if f.Encoding != "utf-8" {
 		info.Encoding = f.Encoding
 	}
@@ -101,7 +96,7 @@ func (e *Engine) detectCitationBibTeX(path string) *brief.BibTeXInfo {
 }
 
 func bibtexReportable(info *brief.BibTeXInfo) bool {
-	return info.ParseStatus != bibtexParsed || len(info.Entries) > 0 || len(info.Diagnostics) > 0
+	return info.ParseStatus != statusParsed || len(info.Entries) > 0 || len(info.Diagnostics) > 0
 }
 
 func (e *Engine) detectCitationBibTeXFiles() *brief.BibTeXInfo {

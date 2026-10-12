@@ -2003,13 +2003,7 @@ func TestSafeReadFileSymlinks(t *testing.T) {
 			t.Skipf("creating file symlink: %v", err)
 		}
 
-		data, err := New(nil, linkedRoot).safeReadFile("go.mod")
-		if err != nil {
-			t.Fatalf("safeReadFile: %v", err)
-		}
-		if got, want := string(data), "module example.com/internal\n"; got != want {
-			t.Errorf("safeReadFile returned %q, want %q", got, want)
-		}
+		assertSafeRead(t, New(nil, linkedRoot), "go.mod", "module example.com/internal\n")
 	})
 
 	t.Run("internal target with relative symlinked root", func(t *testing.T) {
@@ -2029,13 +2023,7 @@ func TestSafeReadFileSymlinks(t *testing.T) {
 		}
 		t.Chdir(parent)
 
-		data, err := New(nil, "linked-project").safeReadFile("go.mod")
-		if err != nil {
-			t.Fatalf("safeReadFile: %v", err)
-		}
-		if got, want := string(data), "module example.com/relative\n"; got != want {
-			t.Errorf("safeReadFile returned %q, want %q", got, want)
-		}
+		assertSafeRead(t, New(nil, "linked-project"), "go.mod", "module example.com/relative\n")
 	})
 
 	t.Run("external target", func(t *testing.T) {
@@ -2059,14 +2047,19 @@ func TestSafeReadFileSymlinks(t *testing.T) {
 		root := t.TempDir()
 		writeProjectFile(t, root, "go.mod", "module example.com/regular\n")
 
-		data, err := New(nil, root).safeReadFile("go.mod")
-		if err != nil {
-			t.Fatalf("safeReadFile: %v", err)
-		}
-		if got, want := string(data), "module example.com/regular\n"; got != want {
-			t.Errorf("safeReadFile returned %q, want %q", got, want)
-		}
+		assertSafeRead(t, New(nil, root), "go.mod", "module example.com/regular\n")
 	})
+}
+
+func assertSafeRead(t *testing.T, e *Engine, path, want string) {
+	t.Helper()
+	data, err := e.safeReadFile(path)
+	if err != nil {
+		t.Fatalf("safeReadFile: %v", err)
+	}
+	if got := string(data); got != want {
+		t.Errorf("safeReadFile returned %q, want %q", got, want)
+	}
 }
 
 func writeProjectFile(t *testing.T, dir, path, content string) {
