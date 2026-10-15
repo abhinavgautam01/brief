@@ -58,6 +58,36 @@ func TestCitationCLI(t *testing.T) {
 	}
 }
 
+func TestCitationCLIInst(t *testing.T) {
+	root, err := filepath.Abs("../../testdata/r-citation-project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report brief.Report
+	if err := json.Unmarshal(citationCLI(t, root, "--json"), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Resources == nil || report.Resources.Metadata["citation"] != "inst/CITATION" {
+		t.Fatalf("R citation path missing: %+v", report.Resources)
+	}
+	if report.Resources.Citation != nil || report.Resources.BibTeX != nil {
+		t.Fatalf("R citation treated as CFF or BibTeX: %+v", report.Resources)
+	}
+}
+
+func TestCitationCLIInstSkipped(t *testing.T) {
+	root := t.TempDir()
+	writeScanFixture(t, root, "README.md", "# Example R package\n")
+	writeScanFixture(t, root, "inst/CITATION", "bibentry(bibtype = \"Article\", title = \"Example\")\n")
+	var report brief.Report
+	if err := json.Unmarshal(citationCLI(t, root, "--json --skip inst"), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Resources != nil && report.Resources.Metadata["citation"] != "" {
+		t.Fatalf("skipped citation reported: %+v", report.Resources)
+	}
+}
+
 func TestCitationCLISchema(t *testing.T) {
 	root := t.TempDir()
 	var schema struct {

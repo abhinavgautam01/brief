@@ -1,0 +1,8 @@
+bibentry(
+    bibtype = "Article",
+    title = "An Example Research Method",
+    author = person("Alice", "Example"),
+    journal = "Example Journal",
+    year = "2024",
+    doi = "10.1234/example"
+)
