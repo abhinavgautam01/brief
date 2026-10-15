@@ -1,0 +1,5 @@
+Package: example
+Title: Example Research Package
+Version: 0.1.0
+Description: An example R package with citation instructions.
+License: MIT

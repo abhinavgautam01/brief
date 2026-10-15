@@ -182,6 +182,7 @@ name = "Citation"
 field = "citation"
 group = "metadata"
 patterns = ["citation.cff", "citation", "citation.bib", "citation.md", "citation.txt"]
+dirs = ["inst"]
 
 [[resources]]
 [resources.resource]

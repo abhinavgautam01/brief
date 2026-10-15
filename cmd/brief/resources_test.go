@@ -53,6 +53,10 @@ func TestScanResourceVariants(t *testing.T) {
 		{"accessibility similar names", []string{"ACCESSIBILITY.md.bak", "docs/Accessibility-Testing.md"}, "community", "accessibility", ""},
 		{"accessibility unrelated directory", []string{"src/ACCESSIBILITY.md"}, "community", "accessibility", ""},
 		{"accessibility absent", nil, "community", "accessibility", ""},
+		{"citation inst mixed case", []string{"inst/Citation.txt"}, "metadata", "citation", "inst/Citation.txt"},
+		{"citation root precedence", []string{"CITATION.txt", "inst/CITATION.cff"}, "metadata", "citation", "CITATION.txt"},
+		{"citation inst similar names", []string{"inst/CITATION.bak", "inst/CITATIONS", "inst/CITATION-guide.md"}, "metadata", "citation", ""},
+		{"citation unrelated directory", []string{"src/CITATION", "inst/doc/CITATION"}, "metadata", "citation", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
