@@ -24,7 +24,7 @@ require (
 	github.com/klauspost/compress v1.20.1
 	github.com/ulikunitz/xz v0.5.17
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/term v0.46.0
+	golang.org/x/term v0.47.0
 )
 
 require (
@@ -43,5 +43,5 @@ require (
 	github.com/odvcencio/gotreesitter v0.53.0 // indirect
 	github.com/package-url/packageurl-go v0.1.7 // indirect
 	github.com/pandatix/go-cvss v0.6.4 // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 )
